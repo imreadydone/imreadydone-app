@@ -68,20 +68,6 @@ export default function Home() {
   const [expandedTodoId, setExpandedTodoId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
-  // Auth 로딩 중
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-white text-lg">로딩 중...</p>
-      </div>
-    );
-  }
-
-  // 로그인 안 되어 있으면 로그인 페이지 표시
-  if (!user) {
-    return <AuthForm />;
-  }
-
   // localStorage에서 뷰 모드 로드
   useEffect(() => {
     const saved = localStorage.getItem("todo-view-mode");
@@ -89,12 +75,6 @@ export default function Home() {
       setViewMode(saved);
     }
   }, []);
-
-  // 뷰 모드 변경 시 localStorage에 저장
-  const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem("todo-view-mode", mode);
-  };
 
   useEffect(() => {
     if (!user) return;
@@ -112,18 +92,40 @@ export default function Home() {
       setNotificationEnabled(Notification.permission === "granted");
     }
 
-    // 포그라운드 메시지 수신 리스너
-    onForegroundMessage((payload) => {
-      console.log("포그라운드 알림:", payload);
-      // 알림 표시 (선택적)
-      if (payload.notification) {
-        new Notification(payload.notification.title || "I Am Ready Done", {
-          body: payload.notification.body,
-          icon: payload.notification.icon || "/icon-192x192.png",
-        });
-      }
-    });
+    try {
+      onForegroundMessage((payload) => {
+        console.log("포그라운드 알림:", payload);
+        if (payload.notification) {
+          new Notification(payload.notification.title || "I Am Ready Done", {
+            body: payload.notification.body,
+            icon: payload.notification.icon || "/icon-192x192.png",
+          });
+        }
+      });
+    } catch (e) {
+      console.warn("FCM 포그라운드 리스너 초기화 실패:", e);
+    }
   }, []);
+
+  // 뷰 모드 변경 시 localStorage에 저장
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem("todo-view-mode", mode);
+  };
+
+  // Auth 로딩 중
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <p className="text-white text-lg">로딩 중...</p>
+      </div>
+    );
+  }
+
+  // 로그인 안 되어 있으면 로그인 페이지 표시
+  if (!user) {
+    return <AuthForm />;
+  }
 
   // 알림 권한 요청 핸들러
   const handleEnableNotifications = async () => {
