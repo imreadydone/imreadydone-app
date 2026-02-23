@@ -22,11 +22,13 @@ const todosRef = collection(db, COLLECTION);
 
 // 생성
 export async function createTodo(
-  todo: Omit<Todo, "id" | "createdAt" | "updatedAt">
+  todo: Omit<Todo, "id" | "createdAt" | "updatedAt">,
+  userId: string
 ): Promise<string> {
   const now = Timestamp.now();
   const docRef = await addDoc(todosRef, {
     ...todo,
+    createdBy: userId,
     createdAt: now,
     updatedAt: now,
   });
@@ -42,13 +44,14 @@ export async function getTodo(id: string): Promise<Todo | null> {
 
 // 조회 (목록)
 export async function getTodos(
+  userId: string,
   filters?: {
     status?: Todo["status"];
     priority?: Todo["priority"];
     category?: string;
   }
 ): Promise<Todo[]> {
-  const constraints: QueryConstraint[] = [];
+  const constraints: QueryConstraint[] = [where("createdBy", "==", userId)];
 
   if (filters?.status) constraints.push(where("status", "==", filters.status));
   if (filters?.priority) constraints.push(where("priority", "==", filters.priority));
@@ -62,10 +65,11 @@ export async function getTodos(
 
 // 실시간 구독
 export function subscribeTodos(
+  userId: string,
   callback: (todos: Todo[]) => void,
   filters?: { status?: Todo["status"] }
 ): Unsubscribe {
-  const constraints: QueryConstraint[] = [];
+  const constraints: QueryConstraint[] = [where("createdBy", "==", userId)];
   if (filters?.status) constraints.push(where("status", "==", filters.status));
   constraints.push(orderBy("createdAt", "desc"));
 
