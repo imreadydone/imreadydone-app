@@ -113,7 +113,13 @@ export async function updateTodoStatus(
 
 // 삭제
 export async function deleteTodo(id: string): Promise<void> {
-  await deleteDoc(doc(db, COLLECTION, id));
+  // 서브태스크(자식 문서)도 함께 삭제
+  const subtasks = await getDocs(
+    query(todosRef, where("parentId", "==", id))
+  );
+  const deletePromises = subtasks.docs.map((d) => deleteDoc(d.ref));
+  deletePromises.push(deleteDoc(doc(db, COLLECTION, id)));
+  await Promise.all(deletePromises);
 }
 
 // 서브태스크 업데이트
