@@ -86,6 +86,14 @@ export default function Home() {
     return () => unsubscribe();
   }, [user]);
 
+  // 부모-자식 그룹핑: 부모 할 일만 추출
+  const parentTodos = todos.filter(t => !t.parentId);
+  
+  // 각 부모의 서브태스크들을 그룹핑
+  const getSubtasks = (parentId: string) => {
+    return todos.filter(t => t.parentId === parentId);
+  };
+
   // 알림 권한 상태 확인
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -195,21 +203,28 @@ export default function Home() {
     await updateTodoSubtask(todoId, subtaskIndex, newStatus);
   };
 
+  // 문서 기반 서브태스크 상태 변경 (새 구조)
+  const handleDocumentSubtaskToggle = async (subtaskId: string, currentStatus: Todo["status"]) => {
+    const newStatus = currentStatus === "done" ? "pending" : "done";
+    await updateTodoStatus(subtaskId, newStatus);
+  };
+
   const toggleExpand = (todoId: string) => {
     setExpandedTodoId(expandedTodoId === todoId ? null : todoId);
   };
 
-  // 칸반 보드용 필터링
+  // 칸반 보드용 필터링 (부모 할 일만)
   const todosByStatus = {
-    pending: todos.filter(t => t.status === "pending"),
-    "in-progress": todos.filter(t => t.status === "in-progress"),
-    done: todos.filter(t => t.status === "done"),
+    pending: parentTodos.filter(t => t.status === "pending"),
+    "in-progress": parentTodos.filter(t => t.status === "in-progress"),
+    done: parentTodos.filter(t => t.status === "done"),
   };
 
   // TodoCard 컴포넌트
   const TodoCard = ({ todo, showStatusChange = false }: { todo: Todo; showStatusChange?: boolean }) => {
     const isExpanded = expandedTodoId === todo.id;
-    const hasDetails = todo.aiAnalysis || todo.subtasks?.length || todo.tags?.length || todo.assignedAgent || todo.description;
+    const documentSubtasks = getSubtasks(todo.id); // 새 구조: 별도 문서로 된 서브태스크
+    const hasDetails = todo.aiAnalysis || todo.subtasks?.length || documentSubtasks.length || todo.tags?.length || todo.assignedAgent || todo.description;
 
     let ddayInfo = null;
     if (todo.dueDate) {
@@ -249,9 +264,9 @@ export default function Home() {
                 </span>
               )}
             </div>
-            {/* D-day 표시 */}
-            {ddayInfo && (
-              <div className="mt-1">
+            <div className="flex items-center gap-2 mt-1">
+              {/* D-day 표시 */}
+              {ddayInfo && (
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                   ddayInfo.isOverdue 
                     ? "bg-red-900/50 text-red-300 border border-red-700"
@@ -261,8 +276,14 @@ export default function Home() {
                 }`}>
                   📅 {ddayInfo.text}
                 </span>
-              </div>
-            )}
+              )}
+              {/* 서브태스크 수 표시 */}
+              {documentSubtasks.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-900/50 text-purple-300 border border-purple-700">
+                  📎 {documentSubtasks.filter(s => s.status === "done").length}/{documentSubtasks.length} 하위 작업
+                </span>
+              )}
+            </div>
           </button>
 
           {todo.category && (
@@ -354,7 +375,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* 서브태스크 */}
+            {/* 서브태스크 (레거시 - 배열 형태) */}
             {todo.subtasks && todo.subtasks.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-gray-400 mb-2">📋 서브태스크</p>
@@ -373,6 +394,35 @@ export default function Home() {
                         }`}
                       >
                         {subtask.title}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* 서브태스크 (새 구조 - 별도 문서) */}
+            {documentSubtasks.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 mb-2">📋 AI 분석 서브태스크</p>
+                <ul className="space-y-1">
+                  {documentSubtasks.map((subtask) => (
+                    <li key={subtask.id} className="flex items-center gap-2 pl-2 border-l-2 border-purple-700">
+                      <input
+                        type="checkbox"
+                        checked={subtask.status === "done"}
+                        onChange={() => handleDocumentSubtaskToggle(subtask.id, subtask.status)}
+                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-gray-800"
+                      />
+                      <span
+                        className={`text-sm ${
+                          subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
+                        }`}
+                      >
+                        {subtask.title}
+                      </span>
+                      <span className="text-xs text-purple-400 ml-auto">
+                        {PRIORITY_EMOJI[subtask.priority]}
                       </span>
                     </li>
                   ))}
@@ -541,18 +591,35 @@ export default function Home() {
         {/* 로딩 상태 */}
         {loading ? (
           <p className="text-gray-500 text-center">로딩 중...</p>
-        ) : todos.length === 0 ? (
+        ) : parentTodos.length === 0 ? (
           <p className="text-gray-500 text-center">할 일이 없습니다 🎉</p>
         ) : (
           <>
             {/* 리스트 뷰 */}
             {viewMode === "list" && (
               <ul className="space-y-2">
-                {todos.map((todo) => (
-                  <li key={todo.id}>
-                    <TodoCard todo={todo} />
-                  </li>
-                ))}
+                {parentTodos.map((todo) => {
+                  const subtasks = getSubtasks(todo.id);
+                  return (
+                    <li key={todo.id}>
+                      <TodoCard todo={todo} />
+                      {/* 서브태스크를 부모 아래에 들여쓰기해서 표시 */}
+                      {subtasks.length > 0 && (
+                        <ul className="mt-2 ml-8 space-y-1">
+                          {subtasks.map((subtask) => (
+                            <li key={subtask.id} className="relative">
+                              <div className="absolute left-0 top-0 bottom-0 w-px bg-purple-700" />
+                              <div className="absolute left-0 top-1/2 w-4 h-px bg-purple-700" />
+                              <div className="ml-6">
+                                <TodoCard todo={subtask} />
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
 
@@ -624,9 +691,9 @@ export default function Home() {
         )}
 
         {/* 통계 */}
-        {todos.length > 0 && (
+        {parentTodos.length > 0 && (
           <div className="mt-6 text-sm text-gray-500 text-center">
-            총 {todos.length}개 | ⬜ {todosByStatus.pending.length} | 🔄{" "}
+            총 {parentTodos.length}개 (서브태스크 {todos.length - parentTodos.length}개) | ⬜ {todosByStatus.pending.length} | 🔄{" "}
             {todosByStatus["in-progress"].length} | ✅{" "}
             {todosByStatus.done.length}
           </div>

@@ -22,4 +22,6 @@ export interface Todo {
   completedAt?: Timestamp;
   createdBy: string;
   source: string;
+  parentId?: string;
+  subtaskCount?: number;
 }
