@@ -5,6 +5,8 @@ import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo, updateTodoSub
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/fcm";
 import { Timestamp } from "firebase/firestore";
 import type { Todo } from "@/types/todo";
+import { useAuth } from "@/contexts/AuthContext";
+import AuthForm from "@/components/AuthForm";
 
 const PRIORITY_EMOJI: Record<string, string> = {
   urgent: "🔴",
@@ -53,6 +55,7 @@ function getDdayText(dueDate: Timestamp): { text: string; isOverdue: boolean; is
 }
 
 export default function Home() {
+  const { user, loading: authLoading, signOut } = useAuth();
   const [todos, setTodos] = useState<Todo[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -64,6 +67,20 @@ export default function Home() {
   const [showDescriptionInput, setShowDescriptionInput] = useState(false);
   const [expandedTodoId, setExpandedTodoId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+
+  // Auth 로딩 중
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <p className="text-white text-lg">로딩 중...</p>
+      </div>
+    );
+  }
+
+  // 로그인 안 되어 있으면 로그인 페이지 표시
+  if (!user) {
+    return <AuthForm />;
+  }
 
   // localStorage에서 뷰 모드 로드
   useEffect(() => {
@@ -80,12 +97,14 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const unsubscribe = subscribeTodos((updatedTodos) => {
+    if (!user) return;
+    
+    const unsubscribe = subscribeTodos(user.uid, (updatedTodos) => {
       setTodos(updatedTodos);
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
   // 알림 권한 상태 확인
   useEffect(() => {
@@ -108,11 +127,11 @@ export default function Home() {
 
   // 알림 권한 요청 핸들러
   const handleEnableNotifications = async () => {
+    if (!user) return;
+    
     setNotificationLoading(true);
     try {
-      // TODO: 실제 사용자 ID로 교체 필요 (Firebase Auth 연동 시)
-      const userId = "default-user";
-      const token = await requestNotificationPermission(userId);
+      const token = await requestNotificationPermission(user.uid);
       if (token) {
         setNotificationEnabled(true);
         alert("알림이 활성화되었습니다! 🔔");
@@ -129,14 +148,14 @@ export default function Home() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !user) return;
 
     const todoData: Omit<Todo, "id" | "createdAt" | "updatedAt"> = {
       title: title.trim(),
       description: description.trim() || undefined,
       status: "pending",
       priority,
-      createdBy: "user",
+      createdBy: user.uid,
       source: "app",
     };
 
@@ -145,7 +164,7 @@ export default function Home() {
       todoData.dueDate = Timestamp.fromDate(new Date(dueDate));
     }
 
-    await createTodo(todoData);
+    await createTodo(todoData, user.uid);
     setTitle("");
     setDescription("");
     setDueDate("");
@@ -403,27 +422,42 @@ export default function Home() {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-3xl font-bold">📋 I Am Ready Done</h1>
           
-          {/* 뷰 모드 토글 */}
-          <div className="flex gap-2 bg-gray-800 rounded-lg p-1">
+          <div className="flex items-center gap-4">
+            {/* 사용자 정보 */}
+            <div className="text-sm text-gray-400">
+              {user?.email}
+            </div>
+
+            {/* 뷰 모드 토글 */}
+            <div className="flex gap-2 bg-gray-800 rounded-lg p-1">
+              <button
+                onClick={() => handleViewModeChange("list")}
+                className={`px-4 py-2 rounded-md font-medium transition ${
+                  viewMode === "list" 
+                    ? "bg-blue-600 text-white" 
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                📝 리스트
+              </button>
+              <button
+                onClick={() => handleViewModeChange("kanban")}
+                className={`px-4 py-2 rounded-md font-medium transition ${
+                  viewMode === "kanban" 
+                    ? "bg-blue-600 text-white" 
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                📊 칸반
+              </button>
+            </div>
+
+            {/* 로그아웃 버튼 */}
             <button
-              onClick={() => handleViewModeChange("list")}
-              className={`px-4 py-2 rounded-md font-medium transition ${
-                viewMode === "list" 
-                  ? "bg-blue-600 text-white" 
-                  : "text-gray-400 hover:text-white"
-              }`}
+              onClick={() => signOut()}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition"
             >
-              📝 리스트
-            </button>
-            <button
-              onClick={() => handleViewModeChange("kanban")}
-              className={`px-4 py-2 rounded-md font-medium transition ${
-                viewMode === "kanban" 
-                  ? "bg-blue-600 text-white" 
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              📊 칸반
+              로그아웃
             </button>
           </div>
         </div>
