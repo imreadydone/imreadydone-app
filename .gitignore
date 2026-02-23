@@ -44,3 +44,13 @@ next-env.d.ts
 .env
 .env.local
 .env.production
+
+# OpenClaw agent files
+AGENTS.md
+BOOTSTRAP.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+CHANGES.md
