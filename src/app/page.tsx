@@ -1,12 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo, updateTodoSubtask, updateTodoAgent } from "@/lib/firestore";
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/fcm";
 import { Timestamp } from "firebase/firestore";
 import type { Todo } from "@/types/todo";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthForm from "@/components/AuthForm";
+import TodoDetailModal from "@/components/TodoDetailModal";
+
+// ============================================
+// 토스트 시스템
+// ============================================
+type ToastType = "success" | "error" | "info" | "warning";
+
+interface Toast {
+  id: string;
+  type: ToastType;
+  message: string;
+  removing?: boolean;
+}
+
+let toastCounter = 0;
+
+function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast: (id: string) => void }) {
+  return (
+    <div className="toast-container">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={`toast toast-${toast.type} ${toast.removing ? "removing" : ""}`}
+          role="alert"
+          aria-live="polite"
+        >
+          <span className="text-2xl" aria-hidden="true">
+            {toast.type === "success" && "✅"}
+            {toast.type === "error" && "❌"}
+            {toast.type === "info" && "ℹ️"}
+            {toast.type === "warning" && "⚠️"}
+          </span>
+          <span className="flex-1 text-sm font-medium">{toast.message}</span>
+          <button
+            onClick={() => removeToast(toast.id)}
+            className="text-gray-400 hover:text-white transition"
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
+// 스켈레톤 로딩 컴포넌트
+// ============================================
+function TodoSkeleton() {
+  return (
+    <div className="skeleton-card skeleton" role="status" aria-label="로딩 중">
+      <span className="sr-only">할 일 로딩 중...</span>
+    </div>
+  );
+}
 
 const PRIORITY_EMOJI: Record<string, string> = {
   urgent: "🔴",
@@ -78,6 +134,7 @@ export default function Home() {
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [showDescriptionInput, setShowDescriptionInput] = useState(false);
   const [expandedTodoId, setExpandedTodoId] = useState<string | null>(null);
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   
   // 검색/필터/정렬 상태
@@ -89,6 +146,78 @@ export default function Home() {
   
   // 모바일 필터 토글 상태
   const [showFilters, setShowFilters] = useState(false);
+  
+  // 애니메이션 및 드래그앤드롭 상태
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const [draggedTodo, setDraggedTodo] = useState<Todo | null>(null);
+  
+  // 토스트 상태
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  
+  // 키보드 단축키용 refs
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // ============================================
+  // 토스트 관리
+  // ============================================
+  const showToast = useCallback((type: ToastType, message: string) => {
+    const id = `toast-${++toastCounter}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, removing: true } : t)));
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 200);
+    }, 3000);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, removing: true } : t)));
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 200);
+  }, []);
+
+  // ============================================
+  // 키보드 단축키
+  // ============================================
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K: 검색에 포커스
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        showToast("info", "검색 모드");
+      }
+      
+      // Cmd/Ctrl + N: 새 할 일 입력에 포커스
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        titleInputRef.current?.focus();
+        showToast("info", "새 할 일 추가");
+      }
+      
+      // Cmd/Ctrl + L: 리스트 뷰
+      if ((e.metaKey || e.ctrlKey) && e.key === "l") {
+        e.preventDefault();
+        handleViewModeChange("list");
+        showToast("info", "리스트 보기");
+      }
+      
+      // Cmd/Ctrl + B: 칸반 뷰
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+        e.preventDefault();
+        handleViewModeChange("kanban");
+        showToast("info", "칸반 보기");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showToast]);
 
   // localStorage에서 뷰 모드 로드
   useEffect(() => {
@@ -234,7 +363,8 @@ export default function Home() {
   // Auth 로딩 중
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4">
+        <div className="spinner-large"></div>
         <p className="text-white text-lg">로딩 중...</p>
       </div>
     );
@@ -254,13 +384,13 @@ export default function Home() {
       const token = await requestNotificationPermission(user.uid);
       if (token) {
         setNotificationEnabled(true);
-        alert("알림이 활성화되었습니다! 🔔");
+        showToast("success", "알림이 활성화되었습니다! 🔔");
       } else {
-        alert("알림 권한이 거부되었습니다.");
+        showToast("error", "알림 권한이 거부되었습니다.");
       }
     } catch (error) {
       console.error("알림 설정 오류:", error);
-      alert("알림 설정 중 오류가 발생했습니다.");
+      showToast("error", "알림 설정 중 오류가 발생했습니다.");
     } finally {
       setNotificationLoading(false);
     }
@@ -284,11 +414,23 @@ export default function Home() {
       todoData.dueDate = Timestamp.fromDate(new Date(dueDate));
     }
 
-    await createTodo(todoData, user.uid);
-    setTitle("");
-    setDescription("");
-    setDueDate("");
-    setShowDescriptionInput(false);
+    try {
+      const newTodoId = await createTodo(todoData, user.uid);
+      setTitle("");
+      setDescription("");
+      setDueDate("");
+      setShowDescriptionInput(false);
+      
+      // 새로 추가된 할 일 ID 저장하여 애니메이션 적용
+      if (newTodoId) {
+        setJustAddedId(newTodoId);
+        setTimeout(() => setJustAddedId(null), 500);
+        showToast("success", `"${title.trim()}" 추가됨 ✨`);
+      }
+    } catch (error) {
+      console.error("할 일 추가 실패:", error);
+      showToast("error", "할 일 추가에 실패했습니다.");
+    }
   };
 
   const handleStatusToggle = async (todo: Todo) => {
@@ -297,7 +439,21 @@ export default function Home() {
       "in-progress": "done",
       done: "pending",
     };
+    
+    // 완료 상태로 변경될 때 성공 피드백
+    const willBeCompleted = todo.status === "in-progress";
+    
     await updateTodoStatus(todo.id, next[todo.status]);
+    
+    // 완료 애니메이션 효과 (선택적)
+    if (willBeCompleted) {
+      // 버튼 클릭 시 짧은 성공 효과
+      const button = document.querySelector(`[data-todo-id="${todo.id}"]`);
+      if (button) {
+        button.classList.add("animate-success-pulse");
+        setTimeout(() => button.classList.remove("animate-success-pulse"), 500);
+      }
+    }
   };
 
   const handleStatusChange = async (todoId: string, newStatus: Todo["status"]) => {
@@ -306,7 +462,81 @@ export default function Home() {
 
   const handleDelete = async (id: string) => {
     if (!user) return;
-    await deleteTodo(id, user.uid);
+    
+    const todo = todos.find(t => t.id === id);
+    
+    // 삭제 애니메이션 시작
+    setDeletingIds(prev => new Set(prev).add(id));
+    
+    // 애니메이션 후 실제 삭제
+    setTimeout(async () => {
+      try {
+        await deleteTodo(id, user.uid);
+        setDeletingIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        if (todo) {
+          showToast("info", `"${todo.title}" 삭제됨`);
+        }
+      } catch (error) {
+        console.error("할 일 삭제 실패:", error);
+        showToast("error", "삭제에 실패했습니다.");
+        setDeletingIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    }, 300);
+  };
+
+  // 드래그앤드롭 핸들러
+  const handleDragStart = (e: React.DragEvent, todo: Todo) => {
+    setDraggedTodo(todo);
+    e.dataTransfer.effectAllowed = "move";
+    // 드래그 중인 요소를 약간 투명하게
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.add("dragging");
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedTodo(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.remove("dragging");
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragEnter = (e: React.DragEvent, targetStatus: Todo["status"]) => {
+    e.preventDefault();
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.add("drag-over");
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.remove("drag-over");
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: Todo["status"]) => {
+    e.preventDefault();
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.remove("drag-over");
+    }
+
+    if (draggedTodo && draggedTodo.status !== targetStatus) {
+      await handleStatusChange(draggedTodo.id, targetStatus);
+    }
+    setDraggedTodo(null);
   };
 
   const handleSubtaskToggle = async (todoId: string, subtaskIndex: number, currentStatus: "pending" | "done") => {
@@ -358,19 +588,33 @@ export default function Home() {
       ddayInfo = getDdayText(todo.dueDate);
     }
 
+    // 애니메이션 클래스 결정
+    const isDeleting = deletingIds.has(todo.id);
+    const isJustAdded = justAddedId === todo.id;
+    
+    const animationClass = isDeleting 
+      ? "animate-slide-up" 
+      : isJustAdded 
+      ? "animate-slide-down" 
+      : "";
+
     return (
       <article
-        className={`rounded-lg border transition ${
+        className={`rounded-lg border transition-smooth ${
           todo.status === "done"
             ? "bg-gray-900 border-gray-800 opacity-60"
             : "bg-gray-800 border-gray-700"
-        }`}
+        } ${animationClass} ${showStatusChange ? "draggable" : ""}`}
         aria-label={`할 일: ${todo.title}`}
+        draggable={showStatusChange}
+        onDragStart={(e) => showStatusChange && handleDragStart(e, todo)}
+        onDragEnd={(e) => showStatusChange && handleDragEnd(e)}
       >
         {/* 메인 카드 */}
         <div className="flex items-center gap-2 sm:gap-3 p-3">
           <button
             onClick={() => handleStatusToggle(todo)}
+            data-todo-id={todo.id}
             className="text-xl hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
             aria-label={`상태 변경: ${STATUS_LABELS[todo.status]}`}
             title={`상태: ${STATUS_LABELS[todo.status]}`}
@@ -381,11 +625,13 @@ export default function Home() {
           
           <button
             onClick={() => toggleExpand(todo.id)}
+            onDoubleClick={() => setSelectedTodo(todo)}
             className={`flex-1 text-left min-h-[44px] sm:min-h-0 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 -mx-2 ${
               todo.status === "done" ? "line-through text-gray-500" : ""
             }`}
             aria-expanded={isExpanded}
             aria-controls={`todo-details-${todo.id}`}
+            title="클릭: 접기/펼치기 | 더블클릭: 상세보기 모달"
           >
             <div className="w-full">
               <div className="flex items-center gap-2">
@@ -682,7 +928,8 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
+    <main className="min-h-screen text-white relative">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
         {/* 헤더 - 반응형 개선 */}
         <header className="mb-4 sm:mb-6">
@@ -751,9 +998,10 @@ export default function Home() {
               <button
                 onClick={handleEnableNotifications}
                 disabled={notificationLoading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-lg font-medium transition"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-lg font-medium transition flex items-center gap-2"
                 aria-label="푸시 알림 활성화"
               >
+                {notificationLoading && <div className="spinner"></div>}
                 {notificationLoading ? "설정 중..." : "활성화"}
               </button>
             </div>
@@ -767,11 +1015,12 @@ export default function Home() {
             <div className="flex-1 relative">
               <label htmlFor="search-input" className="sr-only">할 일 검색</label>
               <input
+                ref={searchInputRef}
                 id="search-input"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="🔍 제목, 설명으로 검색..."
+                placeholder="🔍 제목, 설명으로 검색... (⌘/Ctrl+K)"
                 className="w-full px-4 py-2.5 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 aria-label="할 일 검색"
               />
@@ -996,11 +1245,23 @@ export default function Home() {
           </form>
         </section>
 
-        {/* 로딩 상태 */}
+        {/* 로딩 상태 - 스켈레톤 */}
         {loading ? (
-          <p className="text-gray-500 text-center">로딩 중...</p>
+          <div className="space-y-2" role="status" aria-label="할 일 로딩 중">
+            <TodoSkeleton />
+            <TodoSkeleton />
+            <TodoSkeleton />
+            <TodoSkeleton />
+          </div>
         ) : parentTodos.length === 0 ? (
-          <p className="text-gray-500 text-center">할 일이 없습니다 🎉</p>
+          <div className="empty-state animate-fade-in">
+            <div className="empty-state-icon">📋</div>
+            <div className="empty-state-title">할 일이 없습니다</div>
+            <p className="empty-state-description">
+              위에서 새로운 할 일을 추가하거나{" "}
+              <kbd className="kbd">⌘/Ctrl + N</kbd>을 눌러보세요
+            </p>
+          </div>
         ) : (
           <>
             {/* 리스트 뷰 */}
@@ -1054,7 +1315,14 @@ export default function Home() {
                       {todosByStatus.pending.length}
                     </span>
                   </header>
-                  <div className="space-y-2" role="list">
+                  <div 
+                    className="space-y-2 min-h-[200px] transition-smooth" 
+                    role="list"
+                    onDragOver={handleDragOver}
+                    onDragEnter={(e) => handleDragEnter(e, "pending")}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, "pending")}
+                  >
                     {todosByStatus.pending.map((todo) => (
                       <div key={todo.id} role="listitem">
                         <TodoCard todo={todo} showStatusChange={true} />
@@ -1082,7 +1350,14 @@ export default function Home() {
                       {todosByStatus["in-progress"].length}
                     </span>
                   </header>
-                  <div className="space-y-2" role="list">
+                  <div 
+                    className="space-y-2 min-h-[200px] transition-smooth" 
+                    role="list"
+                    onDragOver={handleDragOver}
+                    onDragEnter={(e) => handleDragEnter(e, "in-progress")}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, "in-progress")}
+                  >
                     {todosByStatus["in-progress"].map((todo) => (
                       <div key={todo.id} role="listitem">
                         <TodoCard todo={todo} showStatusChange={true} />
@@ -1110,7 +1385,14 @@ export default function Home() {
                       {todosByStatus.done.length}
                     </span>
                   </header>
-                  <div className="space-y-2" role="list">
+                  <div 
+                    className="space-y-2 min-h-[200px] transition-smooth" 
+                    role="list"
+                    onDragOver={handleDragOver}
+                    onDragEnter={(e) => handleDragEnter(e, "done")}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, "done")}
+                  >
                     {todosByStatus.done.map((todo) => (
                       <div key={todo.id} role="listitem">
                         <TodoCard todo={todo} showStatusChange={true} />
@@ -1138,6 +1420,21 @@ export default function Home() {
           </footer>
         )}
       </div>
+
+      {/* 할 일 상세보기 모달 */}
+      {selectedTodo && (
+        <TodoDetailModal
+          todo={selectedTodo}
+          documentSubtasks={getSubtasks(selectedTodo.id)}
+          onClose={() => setSelectedTodo(null)}
+          onStatusChange={handleStatusChange}
+          onSubtaskToggle={handleDocumentSubtaskToggle}
+          onAgentChange={handleAgentChange}
+          onRunSubtask={handleRunSubtask}
+          onSubtaskStatusToggle={handleSubtaskToggle}
+          availableAgents={AVAILABLE_AGENTS}
+        />
+      )}
     </main>
   );
 }
