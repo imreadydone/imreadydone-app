@@ -86,6 +86,9 @@ export default function Home() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<Todo["status"][]>([]);
   const [sortMode, setSortMode] = useState<SortMode>("createdAt");
+  
+  // 모바일 필터 토글 상태
+  const [showFilters, setShowFilters] = useState(false);
 
   // localStorage에서 뷰 모드 로드
   useEffect(() => {
@@ -356,74 +359,87 @@ export default function Home() {
     }
 
     return (
-      <div
+      <article
         className={`rounded-lg border transition ${
           todo.status === "done"
             ? "bg-gray-900 border-gray-800 opacity-60"
             : "bg-gray-800 border-gray-700"
         }`}
+        aria-label={`할 일: ${todo.title}`}
       >
         {/* 메인 카드 */}
-        <div className="flex items-center gap-3 p-3">
+        <div className="flex items-center gap-2 sm:gap-3 p-3">
           <button
             onClick={() => handleStatusToggle(todo)}
-            className="text-xl hover:scale-110 transition"
-            title={`상태: ${todo.status}`}
+            className="text-xl hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
+            aria-label={`상태 변경: ${STATUS_LABELS[todo.status]}`}
+            title={`상태: ${STATUS_LABELS[todo.status]}`}
           >
             {STATUS_EMOJI[todo.status]}
           </button>
-          <span className="text-sm">{PRIORITY_EMOJI[todo.priority]}</span>
+          <span className="text-sm" aria-label={`우선순위: ${todo.priority}`}>{PRIORITY_EMOJI[todo.priority]}</span>
           
           <button
             onClick={() => toggleExpand(todo.id)}
-            className={`flex-1 text-left ${
+            className={`flex-1 text-left min-h-[44px] sm:min-h-0 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 -mx-2 ${
               todo.status === "done" ? "line-through text-gray-500" : ""
             }`}
+            aria-expanded={isExpanded}
+            aria-controls={`todo-details-${todo.id}`}
           >
-            <div>
-              {todo.title}
-              {hasDetails && (
-                <span className="ml-2 text-xs text-gray-500">
-                  {isExpanded ? "▼" : "▶"}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2 mt-1">
-              {/* D-day 표시 */}
-              {ddayInfo && (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                  ddayInfo.isOverdue 
-                    ? "bg-red-900/50 text-red-300 border border-red-700"
-                    : ddayInfo.isDueSoon
-                    ? "bg-orange-900/50 text-orange-300 border border-orange-700"
-                    : "bg-blue-900/50 text-blue-300 border border-blue-700"
-                }`}>
-                  📅 {ddayInfo.text}
-                </span>
-              )}
-              {/* 서브태스크 수 표시 */}
-              {documentSubtasks.length > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-900/50 text-purple-300 border border-purple-700">
-                  📎 {documentSubtasks.filter(s => s.status === "done").length}/{documentSubtasks.length} 하위 작업
-                </span>
-              )}
+            <div className="w-full">
+              <div className="flex items-center gap-2">
+                <span>{todo.title}</span>
+                {hasDetails && (
+                  <span className="text-xs text-gray-500" aria-hidden="true">
+                    {isExpanded ? "▼" : "▶"}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {/* D-day 표시 */}
+                {ddayInfo && (
+                  <span 
+                    className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      ddayInfo.isOverdue 
+                        ? "bg-red-900/50 text-red-300 border border-red-700"
+                        : ddayInfo.isDueSoon
+                        ? "bg-orange-900/50 text-orange-300 border border-orange-700"
+                        : "bg-blue-900/50 text-blue-300 border border-blue-700"
+                    }`}
+                    aria-label={`마감: ${ddayInfo.text}`}
+                  >
+                    📅 {ddayInfo.text}
+                  </span>
+                )}
+                {/* 서브태스크 수 표시 */}
+                {documentSubtasks.length > 0 && (
+                  <span 
+                    className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-900/50 text-purple-300 border border-purple-700"
+                    aria-label={`하위 작업: ${documentSubtasks.filter(s => s.status === "done").length}개 완료, 총 ${documentSubtasks.length}개`}
+                  >
+                    📎 {documentSubtasks.filter(s => s.status === "done").length}/{documentSubtasks.length} 하위 작업
+                  </span>
+                )}
+              </div>
             </div>
           </button>
 
           {todo.category && (
-            <span className="text-xs px-2 py-0.5 bg-gray-700 rounded-full text-gray-400">
+            <span className="hidden sm:inline text-xs px-2 py-0.5 bg-gray-700 rounded-full text-gray-400">
               {todo.category}
             </span>
           )}
 
           {/* 칸반 보드에서 상태 변경 버튼 */}
           {showStatusChange && (
-            <div className="flex gap-1">
+            <div className="flex gap-1" role="group" aria-label="상태 변경">
               {/* 대기(pending): → 만 (진행 중으로만 이동 가능) */}
               {todo.status === "pending" && (
                 <button
                   onClick={() => handleStatusChange(todo.id, "in-progress")}
-                  className="text-xs px-2 py-1 bg-blue-700 hover:bg-blue-600 rounded transition"
+                  className="text-xs px-3 py-2 sm:px-2 sm:py-1 bg-blue-700 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition min-h-[44px] sm:min-h-0"
+                  aria-label="진행 중으로 이동"
                   title="진행 중으로 이동"
                 >
                   →
@@ -435,14 +451,16 @@ export default function Home() {
                 <>
                   <button
                     onClick={() => handleStatusChange(todo.id, "pending")}
-                    className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition"
+                    className="text-xs px-3 py-2 sm:px-2 sm:py-1 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 rounded transition min-h-[44px] sm:min-h-0"
+                    aria-label="대기로 이동"
                     title="대기로 이동"
                   >
                     ←
                   </button>
                   <button
                     onClick={() => handleStatusChange(todo.id, "done")}
-                    className="text-xs px-2 py-1 bg-green-700 hover:bg-green-600 rounded transition"
+                    className="text-xs px-3 py-2 sm:px-2 sm:py-1 bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 rounded transition min-h-[44px] sm:min-h-0"
+                    aria-label="완료로 이동"
                     title="완료로 이동"
                   >
                     →
@@ -454,7 +472,8 @@ export default function Home() {
               {todo.status === "done" && (
                 <button
                   onClick={() => handleStatusChange(todo.id, "in-progress")}
-                  className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition"
+                  className="text-xs px-3 py-2 sm:px-2 sm:py-1 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 rounded transition min-h-[44px] sm:min-h-0"
+                  aria-label="진행 중으로 이동"
                   title="진행 중으로 이동"
                 >
                   ←
@@ -465,7 +484,8 @@ export default function Home() {
 
           <button
             onClick={() => handleDelete(todo.id)}
-            className="text-gray-600 hover:text-red-400 transition"
+            className="text-gray-600 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500 rounded transition min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
+            aria-label={`${todo.title} 삭제`}
             title="삭제"
           >
             ✕
@@ -474,7 +494,12 @@ export default function Home() {
 
         {/* 상세 정보 (아코디언) */}
         {isExpanded && hasDetails && (
-          <div className="px-3 pb-3 pt-1 space-y-3 border-t border-gray-700">
+          <div 
+            id={`todo-details-${todo.id}`}
+            className="px-3 pb-3 pt-1 space-y-3 border-t border-gray-700"
+            role="region"
+            aria-label={`${todo.title} 상세 정보`}
+          >
             {/* 설명 */}
             {todo.description && (
               <div>
@@ -499,22 +524,25 @@ export default function Home() {
             {todo.subtasks && todo.subtasks.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-gray-400 mb-2">📋 서브태스크</p>
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {todo.subtasks.map((subtask, index) => (
                     <li key={index} className="flex items-center gap-2">
                       <input
+                        id={`subtask-${todo.id}-${index}`}
                         type="checkbox"
                         checked={subtask.status === "done"}
                         onChange={() => handleSubtaskToggle(todo.id, index, subtask.status)}
-                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                        className="w-5 h-5 sm:w-4 sm:h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                        aria-label={`${subtask.title} ${subtask.status === "done" ? "완료됨" : "미완료"}`}
                       />
-                      <span
-                        className={`text-sm ${
+                      <label
+                        htmlFor={`subtask-${todo.id}-${index}`}
+                        className={`text-sm cursor-pointer ${
                           subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
                         }`}
                       >
                         {subtask.title}
-                      </span>
+                      </label>
                     </li>
                   ))}
                 </ul>
@@ -524,38 +552,52 @@ export default function Home() {
             {/* 서브태스크 (새 구조 - 별도 문서) */}
             {documentSubtasks.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-gray-400 mb-2">📋 AI 분석 서브태스크</p>
+                <h3 className="text-xs font-semibold text-gray-400 mb-2">📋 AI 분석 서브태스크</h3>
                 <ul className="space-y-2">
                   {documentSubtasks.map((subtask) => (
                     <li key={subtask.id} className="pl-2 border-l-2 border-purple-700">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={subtask.status === "done"}
-                          onChange={() => handleDocumentSubtaskToggle(subtask.id, subtask.status)}
-                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-gray-800"
-                        />
-                        <span
-                          className={`text-sm flex-1 ${
-                            subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
-                          }`}
-                        >
-                          {subtask.title}
-                        </span>
-                        <span className="text-xs text-purple-400">
-                          {PRIORITY_EMOJI[subtask.priority]}
-                        </span>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <input
+                            id={`doc-subtask-${subtask.id}`}
+                            type="checkbox"
+                            checked={subtask.status === "done"}
+                            onChange={() => handleDocumentSubtaskToggle(subtask.id, subtask.status)}
+                            className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+                            aria-label={`${subtask.title} ${subtask.status === "done" ? "완료됨" : "미완료"}`}
+                          />
+                          <label
+                            htmlFor={`doc-subtask-${subtask.id}`}
+                            className={`text-sm flex-1 cursor-pointer min-w-0 break-words ${
+                              subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
+                            }`}
+                          >
+                            {subtask.title}
+                          </label>
+                          <span className="text-xs text-purple-400 flex-shrink-0" aria-label={`우선순위: ${subtask.priority}`}>
+                            {PRIORITY_EMOJI[subtask.priority]}
+                          </span>
+                        </div>
                         {/* AI 실행 버튼 */}
                         <button
                           onClick={() => handleRunSubtask(subtask, todo)}
                           disabled={subtask.status === "in-progress" || subtask.status === "done"}
-                          className={`text-xs px-2 py-1 rounded transition ${
+                          className={`text-xs px-3 py-2 sm:px-2 sm:py-1 rounded transition focus:outline-none focus:ring-2 focus:ring-purple-500 flex-shrink-0 min-h-[44px] sm:min-h-0 ${
                             subtask.status === "in-progress"
                               ? "bg-blue-900/50 text-blue-300 cursor-not-allowed"
                               : subtask.status === "done"
                               ? "bg-gray-700 text-gray-500 cursor-not-allowed"
                               : "bg-purple-700 hover:bg-purple-600 text-white"
                           }`}
+                          aria-label={
+                            !todo.assignedAgent
+                              ? "먼저 에이전트를 할당하세요"
+                              : subtask.status === "in-progress"
+                              ? "AI 실행 중"
+                              : subtask.status === "done"
+                              ? "완료됨"
+                              : "AI 실행"
+                          }
                           title={
                             !todo.assignedAgent
                               ? "먼저 에이전트를 할당하세요"
@@ -607,11 +649,15 @@ export default function Home() {
 
             {/* 에이전트 할당 드롭다운 */}
             <div>
-              <p className="text-xs font-semibold text-gray-400 mb-1">👤 할당 에이전트</p>
+              <label htmlFor={`agent-select-${todo.id}`} className="text-xs font-semibold text-gray-400 mb-1 block">
+                👤 할당 에이전트
+              </label>
               <select
+                id={`agent-select-${todo.id}`}
                 value={todo.assignedAgent || ""}
                 onChange={(e) => handleAgentChange(todo.id, e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm focus:outline-none focus:border-purple-500"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                aria-label="에이전트 선택"
               >
                 <option value="">에이전트 선택 안 함</option>
                 {AVAILABLE_AGENTS.map((agent) => (
@@ -637,238 +683,318 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-bold">📋 I Am Ready Done</h1>
-          
-          <div className="flex items-center gap-4">
-            {/* 사용자 정보 */}
-            <div className="text-sm text-gray-400">
-              {user?.email}
-            </div>
+      <div className="max-w-6xl mx-auto p-4 sm:p-6">
+        {/* 헤더 - 반응형 개선 */}
+        <header className="mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <h1 className="text-2xl sm:text-3xl font-bold">📋 I Am Ready Done</h1>
+            
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              {/* 사용자 정보 */}
+              <div className="text-sm text-gray-400 hidden sm:block" aria-label="로그인된 사용자">
+                {user?.email}
+              </div>
 
-            {/* 뷰 모드 토글 */}
-            <div className="flex gap-2 bg-gray-800 rounded-lg p-1">
+              {/* 뷰 모드 토글 */}
+              <div className="flex gap-2 bg-gray-800 rounded-lg p-1" role="group" aria-label="보기 모드 전환">
+                <button
+                  onClick={() => handleViewModeChange("list")}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 ${
+                    viewMode === "list" 
+                      ? "bg-blue-600 text-white" 
+                      : "text-gray-400 hover:text-white hover:bg-gray-700"
+                  }`}
+                  aria-pressed={viewMode === "list"}
+                  aria-label="리스트 보기"
+                >
+                  <span className="hidden sm:inline">📝 리스트</span>
+                  <span className="sm:hidden">📝</span>
+                </button>
+                <button
+                  onClick={() => handleViewModeChange("kanban")}
+                  className={`flex-1 sm:flex-none px-4 py-2 rounded-md font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 ${
+                    viewMode === "kanban" 
+                      ? "bg-blue-600 text-white" 
+                      : "text-gray-400 hover:text-white hover:bg-gray-700"
+                  }`}
+                  aria-pressed={viewMode === "kanban"}
+                  aria-label="칸반 보기"
+                >
+                  <span className="hidden sm:inline">📊 칸반</span>
+                  <span className="sm:hidden">📊</span>
+                </button>
+              </div>
+
+              {/* 로그아웃 버튼 */}
               <button
-                onClick={() => handleViewModeChange("list")}
-                className={`px-4 py-2 rounded-md font-medium transition ${
-                  viewMode === "list" 
-                    ? "bg-blue-600 text-white" 
-                    : "text-gray-400 hover:text-white"
-                }`}
+                onClick={() => signOut()}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-lg font-medium transition"
+                aria-label="로그아웃"
               >
-                📝 리스트
-              </button>
-              <button
-                onClick={() => handleViewModeChange("kanban")}
-                className={`px-4 py-2 rounded-md font-medium transition ${
-                  viewMode === "kanban" 
-                    ? "bg-blue-600 text-white" 
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                📊 칸반
+                로그아웃
               </button>
             </div>
-
-            {/* 로그아웃 버튼 */}
-            <button
-              onClick={() => signOut()}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg font-medium transition"
-            >
-              로그아웃
-            </button>
           </div>
-        </div>
+        </header>
 
         {/* 알림 설정 */}
         {!notificationEnabled && (
-          <div className="mb-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
-            <div className="flex items-center justify-between">
+          <section 
+            className="mb-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg"
+            aria-labelledby="notification-heading"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
-                <p className="font-medium">🔔 푸시 알림 활성화</p>
+                <h2 id="notification-heading" className="font-medium">🔔 푸시 알림 활성화</h2>
                 <p className="text-sm text-gray-400">할 일 알림을 받으려면 권한을 허용하세요</p>
               </div>
               <button
                 onClick={handleEnableNotifications}
                 disabled={notificationLoading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg font-medium transition"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-lg font-medium transition"
+                aria-label="푸시 알림 활성화"
               >
                 {notificationLoading ? "설정 중..." : "활성화"}
               </button>
             </div>
-          </div>
+          </section>
         )}
 
         {/* 검색/필터/정렬 UI */}
-        <div className="mb-6 space-y-3">
-          {/* 검색바 + 정렬 */}
-          <div className="flex gap-2">
+        <section className="mb-6 space-y-3" aria-label="검색 및 필터">
+          {/* 검색바 + 정렬 + 필터 토글 */}
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
+              <label htmlFor="search-input" className="sr-only">할 일 검색</label>
               <input
+                id="search-input"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="🔍 제목, 설명으로 검색..."
-                className="w-full px-4 py-2.5 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-2.5 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                aria-label="할 일 검색"
               />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" aria-hidden="true">🔍</span>
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded p-1"
+                  aria-label="검색어 지우기"
                 >
                   ✕
                 </button>
               )}
             </div>
             
-            <select
-              value={sortMode}
-              onChange={(e) => setSortMode(e.target.value as SortMode)}
-              className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
-            >
-              <option value="createdAt">📅 최근 생성순</option>
-              <option value="priority">⚡ 우선순위순</option>
-              <option value="dueDate">⏰ 마감일순</option>
-            </select>
+            <div className="flex gap-2">
+              <label htmlFor="sort-select" className="sr-only">정렬 방식</label>
+              <select
+                id="sort-select"
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as SortMode)}
+                className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                aria-label="정렬 방식 선택"
+              >
+                <option value="createdAt">📅 최근 생성순</option>
+                <option value="priority">⚡ 우선순위순</option>
+                <option value="dueDate">⏰ 마감일순</option>
+              </select>
+              
+              {/* 모바일 필터 토글 버튼 */}
+              <button
+                type="button"
+                onClick={() => setShowFilters(!showFilters)}
+                className="sm:hidden px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                aria-expanded={showFilters}
+                aria-controls="filter-section"
+                aria-label="필터 토글"
+              >
+                {showFilters ? "필터 닫기 ▲" : "필터 열기 ▼"}
+                {hasActiveFilters && (
+                  <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-blue-600 rounded-full">
+                    !
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
-          {/* 필터 칩들 */}
-          <div className="space-y-2">
+          {/* 필터 칩들 - 모바일에서 접기 가능 */}
+          <div 
+            id="filter-section"
+            className={`space-y-2 ${showFilters ? 'block' : 'hidden sm:block'}`}
+            role="region"
+            aria-label="필터 옵션"
+          >
             {/* 우선순위 필터 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-400 font-medium">우선순위:</span>
-              {(["urgent", "high", "medium", "low"] as Todo["priority"][]).map((priority) => (
-                <button
-                  key={priority}
-                  type="button"
-                  onClick={() => togglePriority(priority)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-                    selectedPriorities.includes(priority)
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                  }`}
-                >
-                  {PRIORITY_EMOJI[priority]}{" "}
-                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                </button>
-              ))}
+            <div className="flex items-start sm:items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-400 font-medium min-w-[80px]" id="priority-filter-label">우선순위:</span>
+              <div className="flex gap-2 flex-wrap" role="group" aria-labelledby="priority-filter-label">
+                {(["urgent", "high", "medium", "low"] as Todo["priority"][]).map((priority) => (
+                  <button
+                    key={priority}
+                    type="button"
+                    onClick={() => togglePriority(priority)}
+                    className={`px-3 py-1.5 sm:py-1 rounded-full text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 ${
+                      selectedPriorities.includes(priority)
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                    aria-pressed={selectedPriorities.includes(priority)}
+                    aria-label={`${priority} 우선순위 필터`}
+                  >
+                    {PRIORITY_EMOJI[priority]}{" "}
+                    <span className="hidden sm:inline">{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* 상태 필터 */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-400 font-medium">상태:</span>
-              {(["pending", "in-progress", "done"] as Todo["status"][]).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => toggleStatus(status)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-                    selectedStatuses.includes(status)
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                  }`}
-                >
-                  {STATUS_EMOJI[status]} {STATUS_LABELS[status]}
-                </button>
-              ))}
+            <div className="flex items-start sm:items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-400 font-medium min-w-[80px]" id="status-filter-label">상태:</span>
+              <div className="flex gap-2 flex-wrap" role="group" aria-labelledby="status-filter-label">
+                {(["pending", "in-progress", "done"] as Todo["status"][]).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => toggleStatus(status)}
+                    className={`px-3 py-1.5 sm:py-1 rounded-full text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 ${
+                      selectedStatuses.includes(status)
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                    aria-pressed={selectedStatuses.includes(status)}
+                    aria-label={`${STATUS_LABELS[status]} 상태 필터`}
+                  >
+                    {STATUS_EMOJI[status]} {STATUS_LABELS[status]}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* 카테고리 필터 */}
             {allCategories.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-gray-400 font-medium">카테고리:</span>
-                {allCategories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => toggleCategory(category)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition ${
-                      selectedCategories.includes(category)
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                    }`}
-                  >
-                    📂 {category}
-                  </button>
-                ))}
+              <div className="flex items-start sm:items-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-400 font-medium min-w-[80px]" id="category-filter-label">카테고리:</span>
+                <div className="flex gap-2 flex-wrap" role="group" aria-labelledby="category-filter-label">
+                  {allCategories.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => toggleCategory(category)}
+                      className={`px-3 py-1.5 sm:py-1 rounded-full text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 ${
+                        selectedCategories.includes(category)
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                      }`}
+                      aria-pressed={selectedCategories.includes(category)}
+                      aria-label={`${category} 카테고리 필터`}
+                    >
+                      📂 {category}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* 필터 초기화 버튼 */}
             {hasActiveFilters && (
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 rounded-lg text-sm font-medium transition"
+                  className="px-3 py-1.5 sm:py-1 bg-red-600/20 hover:bg-red-600/30 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-950 border border-red-600/50 text-red-400 rounded-lg text-sm font-medium transition"
+                  aria-label="모든 필터 초기화"
                 >
                   ✕ 필터 초기화
                 </button>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500" aria-live="polite">
                   {parentTodos.length}개의 할 일 표시 중
                 </span>
               </div>
             )}
           </div>
-        </div>
+        </section>
 
         {/* 추가 폼 */}
-        <form onSubmit={handleAdd} className="mb-8 space-y-2">
-          <div className="flex gap-2 flex-wrap">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="할 일을 입력하세요..."
-              className="flex-1 min-w-[200px] px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
-            />
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value as Todo["priority"])}
-              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-            >
-              <option value="low">🟢 Low</option>
-              <option value="medium">🟡 Medium</option>
-              <option value="high">🟠 High</option>
-              <option value="urgent">🔴 Urgent</option>
-            </select>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
-              title="만료일"
-            />
+        <section aria-labelledby="add-todo-heading">
+          <h2 id="add-todo-heading" className="sr-only">새 할 일 추가</h2>
+          <form onSubmit={handleAdd} className="mb-8 space-y-2">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <label htmlFor="todo-title" className="sr-only">할 일 제목</label>
+              <input
+                id="todo-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="할 일을 입력하세요..."
+                className="flex-1 min-w-0 px-4 py-2.5 sm:py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+                aria-required="true"
+              />
+              <div className="flex gap-2">
+                <label htmlFor="todo-priority" className="sr-only">우선순위</label>
+                <select
+                  id="todo-priority"
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as Todo["priority"])}
+                  className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="우선순위 선택"
+                >
+                  <option value="low">🟢 Low</option>
+                  <option value="medium">🟡 Medium</option>
+                  <option value="high">🟠 High</option>
+                  <option value="urgent">🔴 Urgent</option>
+                </select>
+                <label htmlFor="todo-due-date" className="sr-only">마감일</label>
+                <input
+                  id="todo-due-date"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="flex-1 sm:flex-none px-3 py-2.5 sm:py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="마감일"
+                />
+                <button
+                  type="submit"
+                  className="flex-1 sm:flex-none px-6 py-2.5 sm:py-2 bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-lg font-medium transition min-h-[44px] sm:min-h-0"
+                  aria-label="할 일 추가"
+                >
+                  추가
+                </button>
+              </div>
+            </div>
+            
+            {/* 설명 입력 토글 */}
             <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition"
+              type="button"
+              onClick={() => setShowDescriptionInput(!showDescriptionInput)}
+              className="text-sm text-gray-400 hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1 transition"
+              aria-expanded={showDescriptionInput}
+              aria-controls="description-textarea"
             >
-              추가
+              {showDescriptionInput ? "− 설명 숨기기" : "+ 설명 추가"}
             </button>
-          </div>
-          
-          {/* 설명 입력 토글 */}
-          <button
-            type="button"
-            onClick={() => setShowDescriptionInput(!showDescriptionInput)}
-            className="text-sm text-gray-400 hover:text-gray-300 transition"
-          >
-            {showDescriptionInput ? "− 설명 숨기기" : "+ 설명 추가"}
-          </button>
-          
-          {showDescriptionInput && (
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="상세 설명을 입력하세요... (선택사항)"
-              rows={3}
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
-            />
-          )}
-        </form>
+            
+            {showDescriptionInput && (
+              <div>
+                <label htmlFor="description-textarea" className="sr-only">상세 설명</label>
+                <textarea
+                  id="description-textarea"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="상세 설명을 입력하세요... (선택사항)"
+                  rows={3}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  aria-label="상세 설명"
+                />
+              </div>
+            )}
+          </form>
+        </section>
 
         {/* 로딩 상태 */}
         {loading ? (
@@ -879,20 +1005,20 @@ export default function Home() {
           <>
             {/* 리스트 뷰 */}
             {viewMode === "list" && (
-              <ul className="space-y-2">
+              <ul className="space-y-2" role="list" aria-label="할 일 목록">
                 {parentTodos.map((todo) => {
                   const subtasks = getSubtasks(todo.id);
                   return (
-                    <li key={todo.id}>
+                    <li key={todo.id} role="listitem">
                       <TodoCard todo={todo} />
                       {/* 서브태스크를 부모 아래에 들여쓰기해서 표시 */}
                       {subtasks.length > 0 && (
-                        <ul className="mt-2 ml-8 space-y-1">
+                        <ul className="mt-2 ml-4 sm:ml-8 space-y-1" role="list" aria-label={`${todo.title}의 하위 작업`}>
                           {subtasks.map((subtask) => (
-                            <li key={subtask.id} className="relative">
-                              <div className="absolute left-0 top-0 bottom-0 w-px bg-purple-700" />
-                              <div className="absolute left-0 top-1/2 w-4 h-px bg-purple-700" />
-                              <div className="ml-6">
+                            <li key={subtask.id} className="relative" role="listitem">
+                              <div className="absolute left-0 top-0 bottom-0 w-px bg-purple-700" aria-hidden="true" />
+                              <div className="absolute left-0 top-1/2 w-4 h-px bg-purple-700" aria-hidden="true" />
+                              <div className="ml-4 sm:ml-6">
                                 <TodoCard todo={subtask} />
                               </div>
                             </li>
@@ -907,66 +1033,94 @@ export default function Home() {
 
             {/* 칸반 보드 뷰 */}
             {viewMode === "kanban" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div 
+                className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-4"
+                role="region"
+                aria-label="칸반 보드"
+              >
                 {/* 대기 컬럼 */}
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                <section 
+                  className="bg-gray-900 rounded-lg p-3 sm:p-4 border border-gray-800"
+                  aria-labelledby="pending-column-heading"
+                >
+                  <header className="flex items-center justify-between mb-4">
+                    <h2 id="pending-column-heading" className="text-base sm:text-lg font-semibold flex items-center gap-2">
                       ⬜ {STATUS_LABELS.pending}
                     </h2>
-                    <span className="text-sm bg-gray-800 px-2 py-1 rounded-full">
+                    <span 
+                      className="text-sm bg-gray-800 px-2 py-1 rounded-full"
+                      aria-label={`${todosByStatus.pending.length}개 할 일`}
+                    >
                       {todosByStatus.pending.length}
                     </span>
-                  </div>
-                  <div className="space-y-2">
+                  </header>
+                  <div className="space-y-2" role="list">
                     {todosByStatus.pending.map((todo) => (
-                      <TodoCard key={todo.id} todo={todo} showStatusChange={true} />
+                      <div key={todo.id} role="listitem">
+                        <TodoCard todo={todo} showStatusChange={true} />
+                      </div>
                     ))}
                     {todosByStatus.pending.length === 0 && (
                       <p className="text-sm text-gray-600 text-center py-8">할 일이 없습니다</p>
                     )}
                   </div>
-                </div>
+                </section>
 
                 {/* 진행 중 컬럼 */}
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                <section 
+                  className="bg-gray-900 rounded-lg p-3 sm:p-4 border border-gray-800"
+                  aria-labelledby="in-progress-column-heading"
+                >
+                  <header className="flex items-center justify-between mb-4">
+                    <h2 id="in-progress-column-heading" className="text-base sm:text-lg font-semibold flex items-center gap-2">
                       🔄 {STATUS_LABELS["in-progress"]}
                     </h2>
-                    <span className="text-sm bg-gray-800 px-2 py-1 rounded-full">
+                    <span 
+                      className="text-sm bg-gray-800 px-2 py-1 rounded-full"
+                      aria-label={`${todosByStatus["in-progress"].length}개 할 일`}
+                    >
                       {todosByStatus["in-progress"].length}
                     </span>
-                  </div>
-                  <div className="space-y-2">
+                  </header>
+                  <div className="space-y-2" role="list">
                     {todosByStatus["in-progress"].map((todo) => (
-                      <TodoCard key={todo.id} todo={todo} showStatusChange={true} />
+                      <div key={todo.id} role="listitem">
+                        <TodoCard todo={todo} showStatusChange={true} />
+                      </div>
                     ))}
                     {todosByStatus["in-progress"].length === 0 && (
                       <p className="text-sm text-gray-600 text-center py-8">진행 중인 일이 없습니다</p>
                     )}
                   </div>
-                </div>
+                </section>
 
                 {/* 완료 컬럼 */}
-                <div className="bg-gray-900 rounded-lg p-4 border border-gray-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                <section 
+                  className="bg-gray-900 rounded-lg p-3 sm:p-4 border border-gray-800"
+                  aria-labelledby="done-column-heading"
+                >
+                  <header className="flex items-center justify-between mb-4">
+                    <h2 id="done-column-heading" className="text-base sm:text-lg font-semibold flex items-center gap-2">
                       ✅ {STATUS_LABELS.done}
                     </h2>
-                    <span className="text-sm bg-gray-800 px-2 py-1 rounded-full">
+                    <span 
+                      className="text-sm bg-gray-800 px-2 py-1 rounded-full"
+                      aria-label={`${todosByStatus.done.length}개 할 일`}
+                    >
                       {todosByStatus.done.length}
                     </span>
-                  </div>
-                  <div className="space-y-2">
+                  </header>
+                  <div className="space-y-2" role="list">
                     {todosByStatus.done.map((todo) => (
-                      <TodoCard key={todo.id} todo={todo} showStatusChange={true} />
+                      <div key={todo.id} role="listitem">
+                        <TodoCard todo={todo} showStatusChange={true} />
+                      </div>
                     ))}
                     {todosByStatus.done.length === 0 && (
                       <p className="text-sm text-gray-600 text-center py-8">완료된 일이 없습니다</p>
                     )}
                   </div>
-                </div>
+                </section>
               </div>
             )}
           </>
@@ -974,11 +1128,14 @@ export default function Home() {
 
         {/* 통계 */}
         {parentTodos.length > 0 && (
-          <div className="mt-6 text-sm text-gray-500 text-center">
-            총 {parentTodos.length}개 (서브태스크 {todos.length - parentTodos.length}개) | ⬜ {todosByStatus.pending.length} | 🔄{" "}
-            {todosByStatus["in-progress"].length} | ✅{" "}
-            {todosByStatus.done.length}
-          </div>
+          <footer className="mt-6 text-sm text-gray-500 text-center" role="status" aria-live="polite">
+            <p>
+              총 {parentTodos.length}개 (서브태스크 {todos.length - parentTodos.length}개) | 
+              <span aria-label={`대기 ${todosByStatus.pending.length}개`}> ⬜ {todosByStatus.pending.length}</span> | 
+              <span aria-label={`진행 중 ${todosByStatus["in-progress"].length}개`}> 🔄 {todosByStatus["in-progress"].length}</span> | 
+              <span aria-label={`완료 ${todosByStatus.done.length}개`}> ✅ {todosByStatus.done.length}</span>
+            </p>
+          </footer>
         )}
       </div>
     </main>
