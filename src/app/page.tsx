@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo } from "@/lib/firestore";
+import { requestNotificationPermission, onForegroundMessage } from "@/lib/fcm";
 import type { Todo } from "@/types/todo";
 
 const PRIORITY_EMOJI: Record<string, string> = {
@@ -22,6 +23,8 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Todo["priority"]>("medium");
   const [loading, setLoading] = useState(true);
+  const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [notificationLoading, setNotificationLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeTodos((updatedTodos) => {
@@ -30,6 +33,46 @@ export default function Home() {
     });
     return () => unsubscribe();
   }, []);
+
+  // 알림 권한 상태 확인
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationEnabled(Notification.permission === "granted");
+    }
+
+    // 포그라운드 메시지 수신 리스너
+    onForegroundMessage((payload) => {
+      console.log("포그라운드 알림:", payload);
+      // 알림 표시 (선택적)
+      if (payload.notification) {
+        new Notification(payload.notification.title || "I Am Ready Done", {
+          body: payload.notification.body,
+          icon: payload.notification.icon || "/icon-192x192.png",
+        });
+      }
+    });
+  }, []);
+
+  // 알림 권한 요청 핸들러
+  const handleEnableNotifications = async () => {
+    setNotificationLoading(true);
+    try {
+      // TODO: 실제 사용자 ID로 교체 필요 (Firebase Auth 연동 시)
+      const userId = "default-user";
+      const token = await requestNotificationPermission(userId);
+      if (token) {
+        setNotificationEnabled(true);
+        alert("알림이 활성화되었습니다! 🔔");
+      } else {
+        alert("알림 권한이 거부되었습니다.");
+      }
+    } catch (error) {
+      console.error("알림 설정 오류:", error);
+      alert("알림 설정 중 오류가 발생했습니다.");
+    } finally {
+      setNotificationLoading(false);
+    }
+  };
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +104,26 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gray-950 text-white">
       <div className="max-w-2xl mx-auto p-6">
-        <h1 className="text-3xl font-bold mb-8">📋 I Am Ready Done</h1>
+        <h1 className="text-3xl font-bold mb-4">📋 I Am Ready Done</h1>
+
+        {/* 알림 설정 */}
+        {!notificationEnabled && (
+          <div className="mb-6 p-4 bg-blue-900/30 border border-blue-700 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">🔔 푸시 알림 활성화</p>
+                <p className="text-sm text-gray-400">할 일 알림을 받으려면 권한을 허용하세요</p>
+              </div>
+              <button
+                onClick={handleEnableNotifications}
+                disabled={notificationLoading}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg font-medium transition"
+              >
+                {notificationLoading ? "설정 중..." : "활성화"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 추가 폼 */}
         <form onSubmit={handleAdd} className="flex gap-2 mb-8">
