@@ -106,3 +106,22 @@ export async function updateTodoStatus(
 export async function deleteTodo(id: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTION, id));
 }
+
+// 서브태스크 업데이트
+export async function updateTodoSubtask(
+  todoId: string,
+  subtaskIndex: number,
+  status: "pending" | "done"
+): Promise<void> {
+  const todoDoc = await getTodo(todoId);
+  if (!todoDoc || !todoDoc.subtasks) return;
+
+  const updatedSubtasks = [...todoDoc.subtasks];
+  if (subtaskIndex >= 0 && subtaskIndex < updatedSubtasks.length) {
+    updatedSubtasks[subtaskIndex] = {
+      ...updatedSubtasks[subtaskIndex],
+      status,
+    };
+    await updateTodo(todoId, { subtasks: updatedSubtasks });
+  }
+}
