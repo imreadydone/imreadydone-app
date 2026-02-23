@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo } from "@/lib/firestore";
+import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo, updateTodoSubtask } from "@/lib/firestore";
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/fcm";
 import type { Todo } from "@/types/todo";
 
@@ -21,10 +21,13 @@ const STATUS_EMOJI: Record<string, string> = {
 export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Todo["priority"]>("medium");
   const [loading, setLoading] = useState(true);
   const [notificationEnabled, setNotificationEnabled] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [showDescriptionInput, setShowDescriptionInput] = useState(false);
+  const [expandedTodoId, setExpandedTodoId] = useState<string | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeTodos((updatedTodos) => {
@@ -80,12 +83,15 @@ export default function Home() {
 
     await createTodo({
       title: title.trim(),
+      description: description.trim() || undefined,
       status: "pending",
       priority,
       createdBy: "user",
       source: "app",
     });
     setTitle("");
+    setDescription("");
+    setShowDescriptionInput(false);
   };
 
   const handleStatusToggle = async (todo: Todo) => {
@@ -99,6 +105,15 @@ export default function Home() {
 
   const handleDelete = async (id: string) => {
     await deleteTodo(id);
+  };
+
+  const handleSubtaskToggle = async (todoId: string, subtaskIndex: number, currentStatus: "pending" | "done") => {
+    const newStatus = currentStatus === "done" ? "pending" : "done";
+    await updateTodoSubtask(todoId, subtaskIndex, newStatus);
+  };
+
+  const toggleExpand = (todoId: string) => {
+    setExpandedTodoId(expandedTodoId === todoId ? null : todoId);
   };
 
   return (
@@ -126,30 +141,51 @@ export default function Home() {
         )}
 
         {/* 추가 폼 */}
-        <form onSubmit={handleAdd} className="flex gap-2 mb-8">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="할 일을 입력하세요..."
-            className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
-          />
-          <select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as Todo["priority"])}
-            className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
-          >
-            <option value="low">🟢 Low</option>
-            <option value="medium">🟡 Medium</option>
-            <option value="high">🟠 High</option>
-            <option value="urgent">🔴 Urgent</option>
-          </select>
+        <form onSubmit={handleAdd} className="mb-8 space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="할 일을 입력하세요..."
+              className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
+            />
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as Todo["priority"])}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg"
+            >
+              <option value="low">🟢 Low</option>
+              <option value="medium">🟡 Medium</option>
+              <option value="high">🟠 High</option>
+              <option value="urgent">🔴 Urgent</option>
+            </select>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition"
+            >
+              추가
+            </button>
+          </div>
+          
+          {/* 설명 입력 토글 */}
           <button
-            type="submit"
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition"
+            type="button"
+            onClick={() => setShowDescriptionInput(!showDescriptionInput)}
+            className="text-sm text-gray-400 hover:text-gray-300 transition"
           >
-            추가
+            {showDescriptionInput ? "− 설명 숨기기" : "+ 설명 추가"}
           </button>
+          
+          {showDescriptionInput && (
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="상세 설명을 입력하세요... (선택사항)"
+              rows={3}
+              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500 resize-none"
+            />
+          )}
         </form>
 
         {/* TODO 목록 */}
@@ -159,44 +195,144 @@ export default function Home() {
           <p className="text-gray-500 text-center">할 일이 없습니다 🎉</p>
         ) : (
           <ul className="space-y-2">
-            {todos.map((todo) => (
-              <li
-                key={todo.id}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition ${
-                  todo.status === "done"
-                    ? "bg-gray-900 border-gray-800 opacity-60"
-                    : "bg-gray-800 border-gray-700"
-                }`}
-              >
-                <button
-                  onClick={() => handleStatusToggle(todo)}
-                  className="text-xl hover:scale-110 transition"
-                  title={`상태: ${todo.status}`}
-                >
-                  {STATUS_EMOJI[todo.status]}
-                </button>
-                <span className="text-sm">{PRIORITY_EMOJI[todo.priority]}</span>
-                <span
-                  className={`flex-1 ${
-                    todo.status === "done" ? "line-through text-gray-500" : ""
+            {todos.map((todo) => {
+              const isExpanded = expandedTodoId === todo.id;
+              const hasDetails = todo.aiAnalysis || todo.subtasks?.length || todo.tags?.length || todo.assignedAgent || todo.description;
+
+              return (
+                <li
+                  key={todo.id}
+                  className={`rounded-lg border transition ${
+                    todo.status === "done"
+                      ? "bg-gray-900 border-gray-800 opacity-60"
+                      : "bg-gray-800 border-gray-700"
                   }`}
                 >
-                  {todo.title}
-                </span>
-                {todo.category && (
-                  <span className="text-xs px-2 py-0.5 bg-gray-700 rounded-full text-gray-400">
-                    {todo.category}
-                  </span>
-                )}
-                <button
-                  onClick={() => handleDelete(todo.id)}
-                  className="text-gray-600 hover:text-red-400 transition"
-                  title="삭제"
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
+                  {/* 메인 카드 */}
+                  <div className="flex items-center gap-3 p-3">
+                    <button
+                      onClick={() => handleStatusToggle(todo)}
+                      className="text-xl hover:scale-110 transition"
+                      title={`상태: ${todo.status}`}
+                    >
+                      {STATUS_EMOJI[todo.status]}
+                    </button>
+                    <span className="text-sm">{PRIORITY_EMOJI[todo.priority]}</span>
+                    
+                    <button
+                      onClick={() => toggleExpand(todo.id)}
+                      className={`flex-1 text-left ${
+                        todo.status === "done" ? "line-through text-gray-500" : ""
+                      }`}
+                    >
+                      {todo.title}
+                      {hasDetails && (
+                        <span className="ml-2 text-xs text-gray-500">
+                          {isExpanded ? "▼" : "▶"}
+                        </span>
+                      )}
+                    </button>
+
+                    {todo.category && (
+                      <span className="text-xs px-2 py-0.5 bg-gray-700 rounded-full text-gray-400">
+                        {todo.category}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleDelete(todo.id)}
+                      className="text-gray-600 hover:text-red-400 transition"
+                      title="삭제"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* 상세 정보 (아코디언) */}
+                  {isExpanded && hasDetails && (
+                    <div className="px-3 pb-3 pt-1 space-y-3 border-t border-gray-700">
+                      {/* 설명 */}
+                      {todo.description && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 mb-1">📝 설명</p>
+                          <p className="text-sm text-gray-300">{todo.description}</p>
+                        </div>
+                      )}
+
+                      {/* AI 분석 */}
+                      {!todo.aiAnalysis ? (
+                        <div className="flex items-center gap-2 text-sm text-blue-400">
+                          <span className="animate-pulse">🤖 AI 분석 중...</span>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 mb-1">🤖 AI 분석</p>
+                          <p className="text-sm text-gray-300">{todo.aiAnalysis}</p>
+                        </div>
+                      )}
+
+                      {/* 서브태스크 */}
+                      {todo.subtasks && todo.subtasks.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 mb-2">📋 서브태스크</p>
+                          <ul className="space-y-1">
+                            {todo.subtasks.map((subtask, index) => (
+                              <li key={index} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={subtask.status === "done"}
+                                  onChange={() => handleSubtaskToggle(todo.id, index, subtask.status)}
+                                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                                />
+                                <span
+                                  className={`text-sm ${
+                                    subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
+                                  }`}
+                                >
+                                  {subtask.title}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* 태그 */}
+                      {todo.tags && todo.tags.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 mb-2">🏷️ 태그</p>
+                          <div className="flex flex-wrap gap-1">
+                            {todo.tags.map((tag, index) => (
+                              <span
+                                key={index}
+                                className="text-xs px-2 py-1 bg-blue-900/40 border border-blue-700/50 rounded-md text-blue-300"
+                              >
+                                #{tag}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 할당된 에이전트 */}
+                      {todo.assignedAgent && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 mb-1">👤 할당 에이전트</p>
+                          <p className="text-sm text-purple-400">{todo.assignedAgent}</p>
+                        </div>
+                      )}
+
+                      {/* 카테고리 (상세) */}
+                      {todo.category && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-400 mb-1">📂 카테고리</p>
+                          <p className="text-sm text-gray-300">{todo.category}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
 
