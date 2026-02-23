@@ -28,8 +28,11 @@ export async function createTodo(
   userId: string
 ): Promise<string> {
   const now = Timestamp.now();
+  const cleanTodo = Object.fromEntries(
+    Object.entries(todo).filter(([, v]) => v !== undefined)
+  );
   const docRef = await addDoc(todosRef, {
-    ...todo,
+    ...cleanTodo,
     createdBy: userId,
     createdAt: now,
     updatedAt: now,
