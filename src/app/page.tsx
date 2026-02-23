@@ -28,6 +28,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 type ViewMode = "list" | "kanban";
+type SortMode = "createdAt" | "priority" | "dueDate";
 
 // D-day 계산 함수
 function getDdayText(dueDate: Timestamp): { text: string; isOverdue: boolean; isDueSoon: boolean } {
@@ -67,6 +68,13 @@ export default function Home() {
   const [showDescriptionInput, setShowDescriptionInput] = useState(false);
   const [expandedTodoId, setExpandedTodoId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  
+  // 검색/필터/정렬 상태
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPriorities, setSelectedPriorities] = useState<Todo["priority"][]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<Todo["status"][]>([]);
+  const [sortMode, setSortMode] = useState<SortMode>("createdAt");
 
   // localStorage에서 뷰 모드 로드
   useEffect(() => {
@@ -86,8 +94,68 @@ export default function Home() {
     return () => unsubscribe();
   }, [user]);
 
+  // 카테고리 목록 추출 (중복 제거)
+  const allCategories = Array.from(new Set(todos.map(t => t.category).filter(Boolean))) as string[];
+
+  // 검색/필터/정렬 적용
+  const getFilteredAndSortedTodos = (todoList: Todo[]) => {
+    let filtered = [...todoList];
+
+    // 검색 필터
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (todo) =>
+          todo.title.toLowerCase().includes(query) ||
+          (todo.description && todo.description.toLowerCase().includes(query))
+      );
+    }
+
+    // 우선순위 필터
+    if (selectedPriorities.length > 0) {
+      filtered = filtered.filter((todo) => selectedPriorities.includes(todo.priority));
+    }
+
+    // 카테고리 필터
+    if (selectedCategories.length > 0) {
+      filtered = filtered.filter((todo) => todo.category && selectedCategories.includes(todo.category));
+    }
+
+    // 상태 필터
+    if (selectedStatuses.length > 0) {
+      filtered = filtered.filter((todo) => selectedStatuses.includes(todo.status));
+    }
+
+    // 정렬
+    filtered.sort((a, b) => {
+      switch (sortMode) {
+        case "priority": {
+          const priorityOrder: Record<Todo["priority"], number> = {
+            urgent: 0,
+            high: 1,
+            medium: 2,
+            low: 3,
+          };
+          return priorityOrder[a.priority] - priorityOrder[b.priority];
+        }
+        case "dueDate": {
+          if (!a.dueDate && !b.dueDate) return 0;
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          return a.dueDate.toMillis() - b.dueDate.toMillis();
+        }
+        case "createdAt":
+        default:
+          return b.createdAt.toMillis() - a.createdAt.toMillis();
+      }
+    });
+
+    return filtered;
+  };
+
   // 부모-자식 그룹핑: 부모 할 일만 추출
-  const parentTodos = todos.filter(t => !t.parentId);
+  const allParentTodos = todos.filter(t => !t.parentId);
+  const parentTodos = getFilteredAndSortedTodos(allParentTodos);
   
   // 각 부모의 서브태스크들을 그룹핑
   const getSubtasks = (parentId: string) => {
@@ -120,6 +188,34 @@ export default function Home() {
     setViewMode(mode);
     localStorage.setItem("todo-view-mode", mode);
   };
+
+  // 필터 토글 함수들
+  const togglePriority = (priority: Todo["priority"]) => {
+    setSelectedPriorities((prev) =>
+      prev.includes(priority) ? prev.filter((p) => p !== priority) : [...prev, priority]
+    );
+  };
+
+  const toggleCategory = (category: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
+    );
+  };
+
+  const toggleStatus = (status: Todo["status"]) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
+  };
+
+  const clearAllFilters = () => {
+    setSearchQuery("");
+    setSelectedPriorities([]);
+    setSelectedCategories([]);
+    setSelectedStatuses([]);
+  };
+
+  const hasActiveFilters = searchQuery || selectedPriorities.length > 0 || selectedCategories.length > 0 || selectedStatuses.length > 0;
 
   // Auth 로딩 중
   if (authLoading) {
@@ -213,7 +309,7 @@ export default function Home() {
     setExpandedTodoId(expandedTodoId === todoId ? null : todoId);
   };
 
-  // 칸반 보드용 필터링 (부모 할 일만)
+  // 칸반 보드용 필터링 (부모 할 일만, 검색/필터 적용됨)
   const todosByStatus = {
     pending: parentTodos.filter(t => t.status === "pending"),
     "in-progress": parentTodos.filter(t => t.status === "in-progress"),
@@ -532,6 +628,121 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* 검색/필터/정렬 UI */}
+        <div className="mb-6 space-y-3">
+          {/* 검색바 + 정렬 */}
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="🔍 제목, 설명으로 검색..."
+                className="w-full px-4 py-2.5 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">🔍</span>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            
+            <select
+              value={sortMode}
+              onChange={(e) => setSortMode(e.target.value as SortMode)}
+              className="px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              <option value="createdAt">📅 최근 생성순</option>
+              <option value="priority">⚡ 우선순위순</option>
+              <option value="dueDate">⏰ 마감일순</option>
+            </select>
+          </div>
+
+          {/* 필터 칩들 */}
+          <div className="space-y-2">
+            {/* 우선순위 필터 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-400 font-medium">우선순위:</span>
+              {(["urgent", "high", "medium", "low"] as Todo["priority"][]).map((priority) => (
+                <button
+                  key={priority}
+                  type="button"
+                  onClick={() => togglePriority(priority)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+                    selectedPriorities.includes(priority)
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  }`}
+                >
+                  {PRIORITY_EMOJI[priority]}{" "}
+                  {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* 상태 필터 */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-gray-400 font-medium">상태:</span>
+              {(["pending", "in-progress", "done"] as Todo["status"][]).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => toggleStatus(status)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+                    selectedStatuses.includes(status)
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                  }`}
+                >
+                  {STATUS_EMOJI[status]} {STATUS_LABELS[status]}
+                </button>
+              ))}
+            </div>
+
+            {/* 카테고리 필터 */}
+            {allCategories.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-400 font-medium">카테고리:</span>
+                {allCategories.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => toggleCategory(category)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition ${
+                      selectedCategories.includes(category)
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                    }`}
+                  >
+                    📂 {category}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 필터 초기화 버튼 */}
+            {hasActiveFilters && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="px-3 py-1 bg-red-600/20 hover:bg-red-600/30 border border-red-600/50 text-red-400 rounded-lg text-sm font-medium transition"
+                >
+                  ✕ 필터 초기화
+                </button>
+                <span className="text-xs text-gray-500">
+                  {parentTodos.length}개의 할 일 표시 중
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* 추가 폼 */}
         <form onSubmit={handleAdd} className="mb-8 space-y-2">

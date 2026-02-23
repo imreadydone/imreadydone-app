@@ -62,13 +62,14 @@ export const requestNotificationPermission = async (userId: string): Promise<str
 // FCM 토큰을 Firestore에 저장
 export const saveFCMTokenToFirestore = async (userId: string, token: string) => {
   try {
-    const tokenRef = doc(db, "notifications", userId);
+    const tokenRef = doc(db, "fcmTokens", userId);
     await setDoc(
       tokenRef,
       {
-        fcmToken: token,
+        token,
         updatedAt: serverTimestamp(),
         platform: "web",
+        userAgent: navigator.userAgent,
       },
       { merge: true }
     );
