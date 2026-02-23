@@ -11,11 +11,13 @@ import {
   orderBy,
   Timestamp,
   onSnapshot,
+  setDoc,
   type QueryConstraint,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Todo } from "@/types/todo";
+import type { User } from "@/types/user";
 
 const COLLECTION = "todos";
 const todosRef = collection(db, COLLECTION);
@@ -128,4 +130,42 @@ export async function updateTodoSubtask(
     };
     await updateTodo(todoId, { subtasks: updatedSubtasks });
   }
+}
+
+// ===== User Profile Functions =====
+
+/**
+ * 회원가입 시 사용자 프로필 문서 생성
+ * Firestore Security Rules (콘솔에서 수동 적용):
+ * match /users/{userId} {
+ *   allow read, write: if request.auth != null && request.auth.uid == userId;
+ * }
+ */
+export async function createUserProfile(
+  uid: string,
+  email: string,
+  displayName: string | null = null
+): Promise<void> {
+  const now = Timestamp.now();
+  const userDoc: User = {
+    email,
+    displayName,
+    createdAt: now,
+    updatedAt: now,
+    settings: {
+      notificationsEnabled: false,
+      theme: "dark",
+    },
+  };
+
+  await setDoc(doc(db, "users", uid), userDoc);
+}
+
+/**
+ * 사용자 프로필 조회
+ */
+export async function getUserProfile(uid: string): Promise<User | null> {
+  const docSnap = await getDoc(doc(db, "users", uid));
+  if (!docSnap.exists()) return null;
+  return docSnap.data() as User;
 }

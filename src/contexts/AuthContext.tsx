@@ -9,6 +9,7 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { createUserProfile } from "@/lib/firestore";
 
 interface AuthContextType {
   user: User | null;
@@ -38,7 +39,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // Firestore에 사용자 프로필 문서 생성
+    await createUserProfile(userCredential.user.uid, email, userCredential.user.displayName);
   };
 
   const signOut = async () => {
