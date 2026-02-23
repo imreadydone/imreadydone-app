@@ -59,21 +59,25 @@ export default function AuthForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4 py-8">
       <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold text-white">
+        <header className="text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">
             {isLogin ? "로그인" : "회원가입"}
-          </h2>
+          </h1>
           <p className="mt-2 text-sm text-gray-400">
             할 일 관리를 시작하세요
           </p>
-        </div>
+        </header>
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6" aria-labelledby="auth-form-title">
+          <h2 id="auth-form-title" className="sr-only">
+            {isLogin ? "로그인 폼" : "회원가입 폼"}
+          </h2>
+          
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="sr-only">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
                 이메일
               </label>
               <input
@@ -84,12 +88,14 @@ export default function AuthForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-700 placeholder-gray-500 text-white bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="이메일"
+                className="appearance-none relative block w-full px-3 py-2.5 sm:py-2 border border-gray-700 placeholder-gray-500 text-white bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="이메일을 입력하세요"
+                aria-required="true"
+                aria-invalid={error.includes("이메일") ? "true" : "false"}
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
                 비밀번호
               </label>
               <input
@@ -100,14 +106,21 @@ export default function AuthForm() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-700 placeholder-gray-500 text-white bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="appearance-none relative block w-full px-3 py-2.5 sm:py-2 border border-gray-700 placeholder-gray-500 text-white bg-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="비밀번호 (최소 6자)"
+                aria-required="true"
+                aria-invalid={error.includes("비밀번호") ? "true" : "false"}
+                minLength={6}
               />
             </div>
           </div>
 
           {error && (
-            <div className="rounded-lg bg-red-900/20 border border-red-500 px-4 py-3">
+            <div 
+              className="rounded-lg bg-red-900/20 border border-red-500 px-4 py-3" 
+              role="alert"
+              aria-live="assertive"
+            >
               <p className="text-sm text-red-400">{error}</p>
             </div>
           )}
@@ -116,7 +129,8 @@ export default function AuthForm() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-2.5 sm:py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px] sm:min-h-0"
+              aria-label={loading ? "처리 중" : isLogin ? "로그인" : "회원가입"}
             >
               {loading ? "처리 중..." : isLogin ? "로그인" : "회원가입"}
             </button>
@@ -129,7 +143,8 @@ export default function AuthForm() {
                 setIsLogin(!isLogin);
                 setError("");
               }}
-              className="text-sm text-blue-400 hover:text-blue-300"
+              className="text-sm text-blue-400 hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 py-1"
+              aria-label={isLogin ? "회원가입 페이지로 이동" : "로그인 페이지로 이동"}
             >
               {isLogin
                 ? "계정이 없으신가요? 회원가입"
