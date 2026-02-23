@@ -1,12 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo, updateTodoSubtask, updateTodoAgent } from "@/lib/firestore";
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/fcm";
 import { Timestamp } from "firebase/firestore";
 import type { Todo } from "@/types/todo";
 import { useAuth } from "@/contexts/AuthContext";
 import AuthForm from "@/components/AuthForm";
+import TodoDetailModal from "@/components/TodoDetailModal";
+
+// ============================================
+// 토스트 시스템
+// ============================================
+type ToastType = "success" | "error" | "info" | "warning";
+
+interface Toast {
+  id: string;
+  type: ToastType;
+  message: string;
+  removing?: boolean;
+}
+
+let toastCounter = 0;
+
+function ToastContainer({ toasts, removeToast }: { toasts: Toast[]; removeToast: (id: string) => void }) {
+  return (
+    <div className="toast-container">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={`toast toast-${toast.type} ${toast.removing ? "removing" : ""}`}
+          role="alert"
+          aria-live="polite"
+        >
+          <span className="text-2xl" aria-hidden="true">
+            {toast.type === "success" && "✅"}
+            {toast.type === "error" && "❌"}
+            {toast.type === "info" && "ℹ️"}
+            {toast.type === "warning" && "⚠️"}
+          </span>
+          <span className="flex-1 text-sm font-medium">{toast.message}</span>
+          <button
+            onClick={() => removeToast(toast.id)}
+            className="text-gray-400 hover:text-white transition"
+            aria-label="닫기"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================
+// 스켈레톤 로딩 컴포넌트
+// ============================================
+function TodoSkeleton() {
+  return (
+    <div className="skeleton-card skeleton" role="status" aria-label="로딩 중">
+      <span className="sr-only">할 일 로딩 중...</span>
+    </div>
+  );
+}
 
 const PRIORITY_EMOJI: Record<string, string> = {
   urgent: "🔴",
@@ -78,6 +134,7 @@ export default function Home() {
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [showDescriptionInput, setShowDescriptionInput] = useState(false);
   const [expandedTodoId, setExpandedTodoId] = useState<string | null>(null);
+  const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   
   // 검색/필터/정렬 상태
@@ -94,6 +151,73 @@ export default function Home() {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
   const [draggedTodo, setDraggedTodo] = useState<Todo | null>(null);
+  
+  // 토스트 상태
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  
+  // 키보드 단축키용 refs
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  // ============================================
+  // 토스트 관리
+  // ============================================
+  const showToast = useCallback((type: ToastType, message: string) => {
+    const id = `toast-${++toastCounter}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, removing: true } : t)));
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 200);
+    }, 3000);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, removing: true } : t)));
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 200);
+  }, []);
+
+  // ============================================
+  // 키보드 단축키
+  // ============================================
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Cmd/Ctrl + K: 검색에 포커스
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        showToast("info", "검색 모드");
+      }
+      
+      // Cmd/Ctrl + N: 새 할 일 입력에 포커스
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        titleInputRef.current?.focus();
+        showToast("info", "새 할 일 추가");
+      }
+      
+      // Cmd/Ctrl + L: 리스트 뷰
+      if ((e.metaKey || e.ctrlKey) && e.key === "l") {
+        e.preventDefault();
+        handleViewModeChange("list");
+        showToast("info", "리스트 보기");
+      }
+      
+      // Cmd/Ctrl + B: 칸반 뷰
+      if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+        e.preventDefault();
+        handleViewModeChange("kanban");
+        showToast("info", "칸반 보기");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showToast]);
 
   // localStorage에서 뷰 모드 로드
   useEffect(() => {
@@ -260,13 +384,13 @@ export default function Home() {
       const token = await requestNotificationPermission(user.uid);
       if (token) {
         setNotificationEnabled(true);
-        alert("알림이 활성화되었습니다! 🔔");
+        showToast("success", "알림이 활성화되었습니다! 🔔");
       } else {
-        alert("알림 권한이 거부되었습니다.");
+        showToast("error", "알림 권한이 거부되었습니다.");
       }
     } catch (error) {
       console.error("알림 설정 오류:", error);
-      alert("알림 설정 중 오류가 발생했습니다.");
+      showToast("error", "알림 설정 중 오류가 발생했습니다.");
     } finally {
       setNotificationLoading(false);
     }
@@ -290,16 +414,22 @@ export default function Home() {
       todoData.dueDate = Timestamp.fromDate(new Date(dueDate));
     }
 
-    const newTodoId = await createTodo(todoData, user.uid);
-    setTitle("");
-    setDescription("");
-    setDueDate("");
-    setShowDescriptionInput(false);
-    
-    // 새로 추가된 할 일 ID 저장하여 애니메이션 적용
-    if (newTodoId) {
-      setJustAddedId(newTodoId);
-      setTimeout(() => setJustAddedId(null), 500);
+    try {
+      const newTodoId = await createTodo(todoData, user.uid);
+      setTitle("");
+      setDescription("");
+      setDueDate("");
+      setShowDescriptionInput(false);
+      
+      // 새로 추가된 할 일 ID 저장하여 애니메이션 적용
+      if (newTodoId) {
+        setJustAddedId(newTodoId);
+        setTimeout(() => setJustAddedId(null), 500);
+        showToast("success", `"${title.trim()}" 추가됨 ✨`);
+      }
+    } catch (error) {
+      console.error("할 일 추가 실패:", error);
+      showToast("error", "할 일 추가에 실패했습니다.");
     }
   };
 
@@ -333,17 +463,32 @@ export default function Home() {
   const handleDelete = async (id: string) => {
     if (!user) return;
     
+    const todo = todos.find(t => t.id === id);
+    
     // 삭제 애니메이션 시작
     setDeletingIds(prev => new Set(prev).add(id));
     
     // 애니메이션 후 실제 삭제
     setTimeout(async () => {
-      await deleteTodo(id, user.uid);
-      setDeletingIds(prev => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      try {
+        await deleteTodo(id, user.uid);
+        setDeletingIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        if (todo) {
+          showToast("info", `"${todo.title}" 삭제됨`);
+        }
+      } catch (error) {
+        console.error("할 일 삭제 실패:", error);
+        showToast("error", "삭제에 실패했습니다.");
+        setDeletingIds(prev => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
     }, 300);
   };
 
@@ -480,11 +625,13 @@ export default function Home() {
           
           <button
             onClick={() => toggleExpand(todo.id)}
+            onDoubleClick={() => setSelectedTodo(todo)}
             className={`flex-1 text-left min-h-[44px] sm:min-h-0 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 -mx-2 ${
               todo.status === "done" ? "line-through text-gray-500" : ""
             }`}
             aria-expanded={isExpanded}
             aria-controls={`todo-details-${todo.id}`}
+            title="클릭: 접기/펼치기 | 더블클릭: 상세보기 모달"
           >
             <div className="w-full">
               <div className="flex items-center gap-2">
@@ -781,7 +928,8 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white">
+    <main className="min-h-screen text-white relative">
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
       <div className="max-w-6xl mx-auto p-4 sm:p-6">
         {/* 헤더 - 반응형 개선 */}
         <header className="mb-4 sm:mb-6">
@@ -867,11 +1015,12 @@ export default function Home() {
             <div className="flex-1 relative">
               <label htmlFor="search-input" className="sr-only">할 일 검색</label>
               <input
+                ref={searchInputRef}
                 id="search-input"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="🔍 제목, 설명으로 검색..."
+                placeholder="🔍 제목, 설명으로 검색... (⌘/Ctrl+K)"
                 className="w-full px-4 py-2.5 pl-10 bg-gray-800 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 aria-label="할 일 검색"
               />
@@ -1096,16 +1245,22 @@ export default function Home() {
           </form>
         </section>
 
-        {/* 로딩 상태 */}
+        {/* 로딩 상태 - 스켈레톤 */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-12">
-            <div className="spinner"></div>
-            <p className="text-gray-500 text-center">로딩 중...</p>
+          <div className="space-y-2" role="status" aria-label="할 일 로딩 중">
+            <TodoSkeleton />
+            <TodoSkeleton />
+            <TodoSkeleton />
+            <TodoSkeleton />
           </div>
         ) : parentTodos.length === 0 ? (
-          <div className="text-center py-12 animate-fade-in">
-            <p className="text-gray-500 text-xl">할 일이 없습니다 🎉</p>
-            <p className="text-gray-600 text-sm mt-2">위에서 새로운 할 일을 추가해보세요</p>
+          <div className="empty-state animate-fade-in">
+            <div className="empty-state-icon">📋</div>
+            <div className="empty-state-title">할 일이 없습니다</div>
+            <p className="empty-state-description">
+              위에서 새로운 할 일을 추가하거나{" "}
+              <kbd className="kbd">⌘/Ctrl + N</kbd>을 눌러보세요
+            </p>
           </div>
         ) : (
           <>
@@ -1265,6 +1420,21 @@ export default function Home() {
           </footer>
         )}
       </div>
+
+      {/* 할 일 상세보기 모달 */}
+      {selectedTodo && (
+        <TodoDetailModal
+          todo={selectedTodo}
+          documentSubtasks={getSubtasks(selectedTodo.id)}
+          onClose={() => setSelectedTodo(null)}
+          onStatusChange={handleStatusChange}
+          onSubtaskToggle={handleDocumentSubtaskToggle}
+          onAgentChange={handleAgentChange}
+          onRunSubtask={handleRunSubtask}
+          onSubtaskStatusToggle={handleSubtaskToggle}
+          availableAgents={AVAILABLE_AGENTS}
+        />
+      )}
     </main>
   );
 }
