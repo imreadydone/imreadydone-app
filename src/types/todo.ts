@@ -17,6 +17,7 @@ export interface Todo {
   assignedAgent?: string;
   subtasks?: Subtask[];
   aiAnalysis?: string;
+  result?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   completedAt?: Timestamp;
