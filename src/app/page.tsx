@@ -623,25 +623,25 @@ export default function Home() {
           </button>
           <span className="text-sm" aria-label={`우선순위: ${todo.priority}`}>{PRIORITY_EMOJI[todo.priority]}</span>
           
-          <button
-            onClick={() => toggleExpand(todo.id)}
-            onDoubleClick={() => setSelectedTodo(todo)}
-            className={`flex-1 text-left min-h-[44px] sm:min-h-0 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 -mx-2 ${
-              todo.status === "done" ? "line-through text-gray-500" : ""
-            }`}
-            aria-expanded={isExpanded}
-            aria-controls={`todo-details-${todo.id}`}
-            title="클릭: 접기/펼치기 | 더블클릭: 상세보기 모달"
-          >
-            <div className="w-full">
-              <div className="flex items-center gap-2">
-                <span>{todo.title}</span>
-                {hasDetails && (
-                  <span className="text-xs text-gray-500" aria-hidden="true">
-                    {isExpanded ? "▼" : "▶"}
-                  </span>
-                )}
-              </div>
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <button
+              onClick={() => toggleExpand(todo.id)}
+              className={`flex-1 text-left min-h-[44px] sm:min-h-0 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded px-2 -mx-2 ${
+                todo.status === "done" ? "line-through text-gray-500" : ""
+              }`}
+              aria-expanded={isExpanded}
+              aria-controls={`todo-details-${todo.id}`}
+              title="접기/펼치기"
+            >
+              <div className="w-full">
+                <div className="flex items-center gap-2">
+                  <span>{todo.title}</span>
+                  {hasDetails && (
+                    <span className="text-xs text-gray-500" aria-hidden="true">
+                      {isExpanded ? "▼" : "▶"}
+                    </span>
+                  )}
+                </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {/* D-day 표시 */}
                 {ddayInfo && (
@@ -670,6 +670,17 @@ export default function Home() {
               </div>
             </div>
           </button>
+          
+          {/* 상세보기 버튼 */}
+          <button
+            onClick={() => setSelectedTodo(todo)}
+            className="text-gray-400 hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
+            aria-label={`${todo.title} 상세보기`}
+            title="상세보기"
+          >
+            🔍
+          </button>
+        </div>
 
           {todo.category && (
             <span className="hidden sm:inline text-xs px-2 py-0.5 bg-gray-700 rounded-full text-gray-400">
