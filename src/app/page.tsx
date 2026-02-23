@@ -89,6 +89,11 @@ export default function Home() {
   
   // 모바일 필터 토글 상태
   const [showFilters, setShowFilters] = useState(false);
+  
+  // 애니메이션 및 드래그앤드롭 상태
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const [draggedTodo, setDraggedTodo] = useState<Todo | null>(null);
 
   // localStorage에서 뷰 모드 로드
   useEffect(() => {
@@ -234,7 +239,8 @@ export default function Home() {
   // Auth 로딩 중
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4">
+        <div className="spinner-large"></div>
         <p className="text-white text-lg">로딩 중...</p>
       </div>
     );
@@ -284,11 +290,17 @@ export default function Home() {
       todoData.dueDate = Timestamp.fromDate(new Date(dueDate));
     }
 
-    await createTodo(todoData, user.uid);
+    const newTodoId = await createTodo(todoData, user.uid);
     setTitle("");
     setDescription("");
     setDueDate("");
     setShowDescriptionInput(false);
+    
+    // 새로 추가된 할 일 ID 저장하여 애니메이션 적용
+    if (newTodoId) {
+      setJustAddedId(newTodoId);
+      setTimeout(() => setJustAddedId(null), 500);
+    }
   };
 
   const handleStatusToggle = async (todo: Todo) => {
@@ -297,7 +309,21 @@ export default function Home() {
       "in-progress": "done",
       done: "pending",
     };
+    
+    // 완료 상태로 변경될 때 성공 피드백
+    const willBeCompleted = todo.status === "in-progress";
+    
     await updateTodoStatus(todo.id, next[todo.status]);
+    
+    // 완료 애니메이션 효과 (선택적)
+    if (willBeCompleted) {
+      // 버튼 클릭 시 짧은 성공 효과
+      const button = document.querySelector(`[data-todo-id="${todo.id}"]`);
+      if (button) {
+        button.classList.add("animate-success-pulse");
+        setTimeout(() => button.classList.remove("animate-success-pulse"), 500);
+      }
+    }
   };
 
   const handleStatusChange = async (todoId: string, newStatus: Todo["status"]) => {
@@ -306,7 +332,66 @@ export default function Home() {
 
   const handleDelete = async (id: string) => {
     if (!user) return;
-    await deleteTodo(id, user.uid);
+    
+    // 삭제 애니메이션 시작
+    setDeletingIds(prev => new Set(prev).add(id));
+    
+    // 애니메이션 후 실제 삭제
+    setTimeout(async () => {
+      await deleteTodo(id, user.uid);
+      setDeletingIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, 300);
+  };
+
+  // 드래그앤드롭 핸들러
+  const handleDragStart = (e: React.DragEvent, todo: Todo) => {
+    setDraggedTodo(todo);
+    e.dataTransfer.effectAllowed = "move";
+    // 드래그 중인 요소를 약간 투명하게
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.add("dragging");
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedTodo(null);
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.remove("dragging");
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragEnter = (e: React.DragEvent, targetStatus: Todo["status"]) => {
+    e.preventDefault();
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.add("drag-over");
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.remove("drag-over");
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: Todo["status"]) => {
+    e.preventDefault();
+    if (e.currentTarget instanceof HTMLElement) {
+      e.currentTarget.classList.remove("drag-over");
+    }
+
+    if (draggedTodo && draggedTodo.status !== targetStatus) {
+      await handleStatusChange(draggedTodo.id, targetStatus);
+    }
+    setDraggedTodo(null);
   };
 
   const handleSubtaskToggle = async (todoId: string, subtaskIndex: number, currentStatus: "pending" | "done") => {
@@ -358,19 +443,33 @@ export default function Home() {
       ddayInfo = getDdayText(todo.dueDate);
     }
 
+    // 애니메이션 클래스 결정
+    const isDeleting = deletingIds.has(todo.id);
+    const isJustAdded = justAddedId === todo.id;
+    
+    const animationClass = isDeleting 
+      ? "animate-slide-up" 
+      : isJustAdded 
+      ? "animate-slide-down" 
+      : "";
+
     return (
       <article
-        className={`rounded-lg border transition ${
+        className={`rounded-lg border transition-smooth ${
           todo.status === "done"
             ? "bg-gray-900 border-gray-800 opacity-60"
             : "bg-gray-800 border-gray-700"
-        }`}
+        } ${animationClass} ${showStatusChange ? "draggable" : ""}`}
         aria-label={`할 일: ${todo.title}`}
+        draggable={showStatusChange}
+        onDragStart={(e) => showStatusChange && handleDragStart(e, todo)}
+        onDragEnd={(e) => showStatusChange && handleDragEnd(e)}
       >
         {/* 메인 카드 */}
         <div className="flex items-center gap-2 sm:gap-3 p-3">
           <button
             onClick={() => handleStatusToggle(todo)}
+            data-todo-id={todo.id}
             className="text-xl hover:scale-110 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center"
             aria-label={`상태 변경: ${STATUS_LABELS[todo.status]}`}
             title={`상태: ${STATUS_LABELS[todo.status]}`}
@@ -751,9 +850,10 @@ export default function Home() {
               <button
                 onClick={handleEnableNotifications}
                 disabled={notificationLoading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-lg font-medium transition"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-950 rounded-lg font-medium transition flex items-center gap-2"
                 aria-label="푸시 알림 활성화"
               >
+                {notificationLoading && <div className="spinner"></div>}
                 {notificationLoading ? "설정 중..." : "활성화"}
               </button>
             </div>
@@ -998,9 +1098,15 @@ export default function Home() {
 
         {/* 로딩 상태 */}
         {loading ? (
-          <p className="text-gray-500 text-center">로딩 중...</p>
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <div className="spinner"></div>
+            <p className="text-gray-500 text-center">로딩 중...</p>
+          </div>
         ) : parentTodos.length === 0 ? (
-          <p className="text-gray-500 text-center">할 일이 없습니다 🎉</p>
+          <div className="text-center py-12 animate-fade-in">
+            <p className="text-gray-500 text-xl">할 일이 없습니다 🎉</p>
+            <p className="text-gray-600 text-sm mt-2">위에서 새로운 할 일을 추가해보세요</p>
+          </div>
         ) : (
           <>
             {/* 리스트 뷰 */}
@@ -1054,7 +1160,14 @@ export default function Home() {
                       {todosByStatus.pending.length}
                     </span>
                   </header>
-                  <div className="space-y-2" role="list">
+                  <div 
+                    className="space-y-2 min-h-[200px] transition-smooth" 
+                    role="list"
+                    onDragOver={handleDragOver}
+                    onDragEnter={(e) => handleDragEnter(e, "pending")}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, "pending")}
+                  >
                     {todosByStatus.pending.map((todo) => (
                       <div key={todo.id} role="listitem">
                         <TodoCard todo={todo} showStatusChange={true} />
@@ -1082,7 +1195,14 @@ export default function Home() {
                       {todosByStatus["in-progress"].length}
                     </span>
                   </header>
-                  <div className="space-y-2" role="list">
+                  <div 
+                    className="space-y-2 min-h-[200px] transition-smooth" 
+                    role="list"
+                    onDragOver={handleDragOver}
+                    onDragEnter={(e) => handleDragEnter(e, "in-progress")}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, "in-progress")}
+                  >
                     {todosByStatus["in-progress"].map((todo) => (
                       <div key={todo.id} role="listitem">
                         <TodoCard todo={todo} showStatusChange={true} />
@@ -1110,7 +1230,14 @@ export default function Home() {
                       {todosByStatus.done.length}
                     </span>
                   </header>
-                  <div className="space-y-2" role="list">
+                  <div 
+                    className="space-y-2 min-h-[200px] transition-smooth" 
+                    role="list"
+                    onDragOver={handleDragOver}
+                    onDragEnter={(e) => handleDragEnter(e, "done")}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, "done")}
+                  >
                     {todosByStatus.done.map((todo) => (
                       <div key={todo.id} role="listitem">
                         <TodoCard todo={todo} showStatusChange={true} />
