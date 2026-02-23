@@ -527,46 +527,61 @@ export default function Home() {
                 <p className="text-xs font-semibold text-gray-400 mb-2">📋 AI 분석 서브태스크</p>
                 <ul className="space-y-2">
                   {documentSubtasks.map((subtask) => (
-                    <li key={subtask.id} className="flex items-center gap-2 pl-2 border-l-2 border-purple-700">
-                      <input
-                        type="checkbox"
-                        checked={subtask.status === "done"}
-                        onChange={() => handleDocumentSubtaskToggle(subtask.id, subtask.status)}
-                        className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-gray-800"
-                      />
-                      <span
-                        className={`text-sm flex-1 ${
-                          subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
-                        }`}
-                      >
-                        {subtask.title}
-                      </span>
-                      <span className="text-xs text-purple-400">
-                        {PRIORITY_EMOJI[subtask.priority]}
-                      </span>
-                      {/* AI 실행 버튼 */}
-                      <button
-                        onClick={() => handleRunSubtask(subtask, todo)}
-                        disabled={subtask.status === "in-progress" || subtask.status === "done"}
-                        className={`text-xs px-2 py-1 rounded transition ${
-                          subtask.status === "in-progress"
-                            ? "bg-blue-900/50 text-blue-300 cursor-not-allowed"
-                            : subtask.status === "done"
-                            ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                            : "bg-purple-700 hover:bg-purple-600 text-white"
-                        }`}
-                        title={
-                          !todo.assignedAgent
-                            ? "먼저 에이전트를 할당하세요"
-                            : subtask.status === "in-progress"
-                            ? "실행 중"
-                            : subtask.status === "done"
-                            ? "완료됨"
-                            : "AI 실행"
-                        }
-                      >
-                        {subtask.status === "in-progress" ? "🔄 실행 중" : "🤖 실행"}
-                      </button>
+                    <li key={subtask.id} className="pl-2 border-l-2 border-purple-700">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={subtask.status === "done"}
+                          onChange={() => handleDocumentSubtaskToggle(subtask.id, subtask.status)}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-gray-800"
+                        />
+                        <span
+                          className={`text-sm flex-1 ${
+                            subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
+                          }`}
+                        >
+                          {subtask.title}
+                        </span>
+                        <span className="text-xs text-purple-400">
+                          {PRIORITY_EMOJI[subtask.priority]}
+                        </span>
+                        {/* AI 실행 버튼 */}
+                        <button
+                          onClick={() => handleRunSubtask(subtask, todo)}
+                          disabled={subtask.status === "in-progress" || subtask.status === "done"}
+                          className={`text-xs px-2 py-1 rounded transition ${
+                            subtask.status === "in-progress"
+                              ? "bg-blue-900/50 text-blue-300 cursor-not-allowed"
+                              : subtask.status === "done"
+                              ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                              : "bg-purple-700 hover:bg-purple-600 text-white"
+                          }`}
+                          title={
+                            !todo.assignedAgent
+                              ? "먼저 에이전트를 할당하세요"
+                              : subtask.status === "in-progress"
+                              ? "실행 중"
+                              : subtask.status === "done"
+                              ? "완료됨"
+                              : "AI 실행"
+                          }
+                        >
+                          {subtask.status === "in-progress" ? "🔄 실행 중" : "🤖 실행"}
+                        </button>
+                      </div>
+                      
+                      {/* AI 실행 결과 표시 */}
+                      {subtask.status === "done" && subtask.result && (
+                        <div className="mt-2 ml-6 p-3 bg-green-900/20 border border-green-700/30 rounded-lg">
+                          <p className="text-xs font-semibold text-green-400 mb-1">✅ 실행 결과</p>
+                          <p className="text-sm text-gray-300 whitespace-pre-wrap">{subtask.result}</p>
+                          {subtask.completedAt && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              완료: {new Date(subtask.completedAt.seconds * 1000).toLocaleString('ko-KR')}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
