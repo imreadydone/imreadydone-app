@@ -1,40 +1,41 @@
-@import "tailwindcss";
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  /* Neo-Brutalist 색상 팔레트 */
-  --primary-gradient: linear-gradient(135deg, #FFD700 0%, #FF8C00 100%);
-  --accent-pink: #FF6B9D;
-  --accent-cyan: #00D4FF;
-  --accent-lime: #CCFF00;
-  --dark-navy: #0A0E27;
-  --dark-navy-light: #1A1F3A;
-  --dark-navy-lighter: #2A2F4A;
+  /* Digital Garden Color Palette */
+  --bg-primary: #0a0e0d;
+  --bg-secondary: #111816;
+  --bg-tertiary: #1a2421;
   
-  /* 그림자 */
-  --shadow-brutal: 6px 6px 0px rgba(255, 215, 0, 0.4);
-  --shadow-brutal-hover: 8px 8px 0px rgba(255, 215, 0, 0.6);
-  --shadow-brutal-pink: 4px 4px 0px rgba(255, 107, 157, 0.5);
-  --shadow-brutal-cyan: 4px 4px 0px rgba(0, 212, 255, 0.5);
+  --surface-primary: #1e2b27;
+  --surface-secondary: #243530;
+  --surface-hover: #2a3f38;
   
-  --background: var(--dark-navy);
-  --foreground: #FFFFFF;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --accent-green: #52d9a3;
+  --accent-green-light: #6ee7b5;
+  --accent-green-dark: #3cb889;
   
-  /* 커스텀 색상 */
-  --color-primary-*: initial;
-  --color-primary: #FFD700;
-  --color-primary-dark: #FF8C00;
-  --color-accent-pink: #FF6B9D;
-  --color-accent-cyan: #00D4FF;
-  --color-accent-lime: #CCFF00;
-  --color-navy: #0A0E27;
-  --color-navy-light: #1A1F3A;
-  --color-navy-lighter: #2A2F4A;
+  --accent-sage: #8fb8a3;
+  --accent-moss: #6b9080;
+  --accent-earth: #a67c52;
+  
+  --text-primary: #e8f2ed;
+  --text-secondary: #b8d4c8;
+  --text-tertiary: #7a9987;
+  --text-muted: #4a6158;
+  
+  --urgent: #ff6b6b;
+  --high: #ffa94d;
+  --medium: #ffd93d;
+  --low: #52d9a3;
+  
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  
+  --blur-sm: blur(8px);
+  --blur-md: blur(16px);
 }
 
 * {
@@ -44,17 +45,116 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  font-weight: 400;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  font-family: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow-x: hidden;
 }
 
-/* 애니메이션 정의 */
-@keyframes slideInUp {
+/* Animated background gradient */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.bg-garden {
+  background: linear-gradient(
+    135deg,
+    var(--bg-primary) 0%,
+    #0d1512 25%,
+    #0f1a15 50%,
+    #0d1512 75%,
+    var(--bg-primary) 100%
+  );
+  background-size: 200% 200%;
+  animation: gradient-shift 15s ease infinite;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-moss);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-sage);
+}
+
+/* Typography */
+.font-display {
+  font-family: 'Instrument Serif', Georgia, serif;
+}
+
+.font-sans {
+  font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+}
+
+/* Glowing effect for important elements */
+.glow-green {
+  box-shadow: 0 0 20px rgba(82, 217, 163, 0.3),
+              0 0 40px rgba(82, 217, 163, 0.1);
+}
+
+.glow-green-strong {
+  box-shadow: 0 0 20px rgba(82, 217, 163, 0.5),
+              0 0 40px rgba(82, 217, 163, 0.2),
+              0 0 60px rgba(82, 217, 163, 0.1);
+}
+
+/* Glass morphism effect */
+.glass {
+  background: rgba(30, 43, 39, 0.6);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(82, 217, 163, 0.1);
+}
+
+.glass-strong {
+  background: rgba(30, 43, 39, 0.8);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(82, 217, 163, 0.2);
+}
+
+/* Organic shapes */
+.organic-blob {
+  border-radius: 60% 40% 70% 30% / 40% 60% 40% 60%;
+}
+
+.organic-blob-2 {
+  border-radius: 40% 60% 30% 70% / 60% 40% 60% 40%;
+}
+
+/* Smooth animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(3deg);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in {
   from {
     opacity: 0;
     transform: translateY(20px);
@@ -65,10 +165,10 @@ body {
   }
 }
 
-@keyframes scaleIn {
+@keyframes scale-in {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.9);
   }
   to {
     opacity: 1;
@@ -76,133 +176,229 @@ body {
   }
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
+.animate-float {
+  animation: float 6s ease-in-out infinite;
 }
 
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
-  }
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
 }
 
-@keyframes gradient-shift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-/* 커스텀 스크롤바 */
-::-webkit-scrollbar {
-  width: 10px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--dark-navy-light);
-}
-
-::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #FFD700 0%, #FF8C00 100%);
-  border-radius: 5px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #FF8C00 0%, #FFD700 100%);
-}
-
-/* 선택 텍스트 스타일 */
-::selection {
-  background: var(--accent-pink);
-  color: white;
-}
-
-::-moz-selection {
-  background: var(--accent-pink);
-  color: white;
-}
-
-/* 글로벌 유틸리티 클래스 */
-.gradient-text {
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.brutal-shadow {
-  box-shadow: var(--shadow-brutal);
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.brutal-shadow:hover {
-  box-shadow: var(--shadow-brutal-hover);
-  transform: translate(-2px, -2px);
-}
-
-.animate-slide-up {
-  animation: slideInUp 0.4s ease-out;
+.animate-slide-in {
+  animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.3s ease-out;
+  animation: scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.animate-shake {
-  animation: shake 0.4s ease-in-out;
+/* Stagger children animations */
+.stagger-children > * {
+  opacity: 0;
+  animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* 입력 필드 스타일 */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="date"],
-textarea,
-select {
-  font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+.stagger-children > *:nth-child(9) { animation-delay: 0.45s; }
+.stagger-children > *:nth-child(10) { animation-delay: 0.5s; }
+
+/* Hover effects */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 버튼 기본 스타일 */
-button {
-  font-family: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
 }
 
-button:active {
-  transform: scale(0.98);
+/* Button styles */
+.btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 포커스 스타일 */
+.btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.btn:active {
+  transform: scale(0.95);
+}
+
+/* Input focus effects */
 input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 215, 0, 0.3);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 0 3px rgba(82, 217, 163, 0.1);
 }
 
-/* 로딩 스피너 */
-.loading-spinner {
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top: 3px solid #FFD700;
+/* Noise texture overlay */
+.noise-overlay {
+  position: relative;
+}
+
+.noise-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+}
+
+/* Decorative background elements */
+.bg-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-orb-1 {
+  width: 500px;
+  height: 500px;
+  background: var(--accent-green);
+  top: -200px;
+  right: -200px;
+  animation: float 20s ease-in-out infinite;
+}
+
+.bg-orb-2 {
+  width: 400px;
+  height: 400px;
+  background: var(--accent-sage);
+  bottom: -150px;
+  left: -150px;
+  animation: float 25s ease-in-out infinite reverse;
+}
+
+.bg-orb-3 {
+  width: 300px;
+  height: 300px;
+  background: var(--accent-moss);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: pulse-glow 15s ease-in-out infinite;
+}
+
+/* Priority colors */
+.priority-urgent {
+  --priority-color: var(--urgent);
+}
+
+.priority-high {
+  --priority-color: var(--high);
+}
+
+.priority-medium {
+  --priority-color: var(--medium);
+}
+
+.priority-low {
+  --priority-color: var(--low);
+}
+
+/* Status indicators */
+.status-pending {
+  border-left: 3px solid var(--text-tertiary);
+}
+
+.status-in-progress {
+  border-left: 3px solid var(--accent-green);
+}
+
+.status-done {
+  border-left: 3px solid var(--accent-sage);
+  opacity: 0.7;
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  border: 3px solid rgba(82, 217, 163, 0.1);
+  border-top-color: var(--accent-green);
   border-radius: 50%;
   width: 40px;
   height: 40px;
   animation: spin 0.8s linear infinite;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+/* Checkbox custom styling */
+input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--accent-moss);
+  border-radius: 4px;
+  background: var(--surface-primary);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+input[type="checkbox"]:hover {
+  border-color: var(--accent-green);
+  transform: scale(1.1);
+}
+
+input[type="checkbox"]:checked {
+  background: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+input[type="checkbox"]:checked::before {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--bg-primary);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Smooth transitions */
+* {
+  transition: background-color 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease;
+}
+
+button, input, textarea, select {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
