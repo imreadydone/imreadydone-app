@@ -291,7 +291,8 @@ export default function Home() {
   };
 
   const handleDelete = async (id: string) => {
-    await deleteTodo(id);
+    if (!user) return;
+    await deleteTodo(id, user.uid);
   };
 
   const handleSubtaskToggle = async (todoId: string, subtaskIndex: number, currentStatus: "pending" | "done") => {
