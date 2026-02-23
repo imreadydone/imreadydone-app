@@ -141,6 +141,17 @@ export async function updateTodoSubtask(
   }
 }
 
+// 에이전트 할당 업데이트
+export async function updateTodoAgent(
+  id: string,
+  agent: string | null
+): Promise<void> {
+  await updateDoc(doc(db, COLLECTION, id), {
+    assignedAgent: agent || null,
+    updatedAt: Timestamp.now(),
+  });
+}
+
 // ===== User Profile Functions =====
 
 /**

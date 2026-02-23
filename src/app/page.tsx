@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo, updateTodoSubtask } from "@/lib/firestore";
+import { subscribeTodos, createTodo, updateTodoStatus, deleteTodo, updateTodoSubtask, updateTodoAgent } from "@/lib/firestore";
 import { requestNotificationPermission, onForegroundMessage } from "@/lib/fcm";
 import { Timestamp } from "firebase/firestore";
 import type { Todo } from "@/types/todo";
@@ -26,6 +26,17 @@ const STATUS_LABELS: Record<string, string> = {
   "in-progress": "진행 중",
   done: "완료",
 };
+
+const AVAILABLE_AGENTS = [
+  "todo-app",
+  "todo-listener",
+  "airstream-hub",
+  "airstream-master-front",
+  "airstream-lessor-front",
+  "trucker-hub",
+  "trucker-master",
+  "trucker-office",
+] as const;
 
 type ViewMode = "list" | "kanban";
 type SortMode = "createdAt" | "priority" | "dueDate";
@@ -310,6 +321,22 @@ export default function Home() {
     setExpandedTodoId(expandedTodoId === todoId ? null : todoId);
   };
 
+  // 에이전트 할당
+  const handleAgentChange = async (todoId: string, agent: string) => {
+    const agentValue = agent === "" ? null : agent;
+    await updateTodoAgent(todoId, agentValue);
+  };
+
+  // 서브태스크 AI 실행
+  const handleRunSubtask = async (subtask: Todo, parentTodo: Todo) => {
+    if (!parentTodo.assignedAgent) {
+      alert("먼저 부모 할 일에 에이전트를 할당해주세요.");
+      return;
+    }
+    // 서브태스크 상태를 in-progress로 변경
+    await updateTodoStatus(subtask.id, "in-progress");
+  };
+
   // 칸반 보드용 필터링 (부모 할 일만, 검색/필터 적용됨)
   const todosByStatus = {
     pending: parentTodos.filter(t => t.status === "pending"),
@@ -392,15 +419,7 @@ export default function Home() {
           {/* 칸반 보드에서 상태 변경 버튼 */}
           {showStatusChange && (
             <div className="flex gap-1">
-              {todo.status !== "pending" && (
-                <button
-                  onClick={() => handleStatusChange(todo.id, "pending")}
-                  className="text-xs px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded transition"
-                  title="대기로 이동"
-                >
-                  ←
-                </button>
-              )}
+              {/* 대기(pending): → 만 (진행 중으로만 이동 가능) */}
               {todo.status === "pending" && (
                 <button
                   onClick={() => handleStatusChange(todo.id, "in-progress")}
@@ -410,6 +429,8 @@ export default function Home() {
                   →
                 </button>
               )}
+              
+              {/* 진행 중(in-progress): ← → (대기로 되돌리기 or 완료로) */}
               {todo.status === "in-progress" && (
                 <>
                   <button
@@ -428,6 +449,8 @@ export default function Home() {
                   </button>
                 </>
               )}
+              
+              {/* 완료(done): ← 만 (진행 중으로 되돌리기) */}
               {todo.status === "done" && (
                 <button
                   onClick={() => handleStatusChange(todo.id, "in-progress")}
@@ -502,7 +525,7 @@ export default function Home() {
             {documentSubtasks.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-gray-400 mb-2">📋 AI 분석 서브태스크</p>
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {documentSubtasks.map((subtask) => (
                     <li key={subtask.id} className="flex items-center gap-2 pl-2 border-l-2 border-purple-700">
                       <input
@@ -512,15 +535,38 @@ export default function Home() {
                         className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-purple-500 focus:ring-offset-gray-800"
                       />
                       <span
-                        className={`text-sm ${
+                        className={`text-sm flex-1 ${
                           subtask.status === "done" ? "line-through text-gray-500" : "text-gray-300"
                         }`}
                       >
                         {subtask.title}
                       </span>
-                      <span className="text-xs text-purple-400 ml-auto">
+                      <span className="text-xs text-purple-400">
                         {PRIORITY_EMOJI[subtask.priority]}
                       </span>
+                      {/* AI 실행 버튼 */}
+                      <button
+                        onClick={() => handleRunSubtask(subtask, todo)}
+                        disabled={subtask.status === "in-progress" || subtask.status === "done"}
+                        className={`text-xs px-2 py-1 rounded transition ${
+                          subtask.status === "in-progress"
+                            ? "bg-blue-900/50 text-blue-300 cursor-not-allowed"
+                            : subtask.status === "done"
+                            ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                            : "bg-purple-700 hover:bg-purple-600 text-white"
+                        }`}
+                        title={
+                          !todo.assignedAgent
+                            ? "먼저 에이전트를 할당하세요"
+                            : subtask.status === "in-progress"
+                            ? "실행 중"
+                            : subtask.status === "done"
+                            ? "완료됨"
+                            : "AI 실행"
+                        }
+                      >
+                        {subtask.status === "in-progress" ? "🔄 실행 중" : "🤖 실행"}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -544,13 +590,22 @@ export default function Home() {
               </div>
             )}
 
-            {/* 할당된 에이전트 */}
-            {todo.assignedAgent && (
-              <div>
-                <p className="text-xs font-semibold text-gray-400 mb-1">👤 할당 에이전트</p>
-                <p className="text-sm text-purple-400">{todo.assignedAgent}</p>
-              </div>
-            )}
+            {/* 에이전트 할당 드롭다운 */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 mb-1">👤 할당 에이전트</p>
+              <select
+                value={todo.assignedAgent || ""}
+                onChange={(e) => handleAgentChange(todo.id, e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-sm focus:outline-none focus:border-purple-500"
+              >
+                <option value="">에이전트 선택 안 함</option>
+                {AVAILABLE_AGENTS.map((agent) => (
+                  <option key={agent} value={agent}>
+                    {agent}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* 카테고리 (상세) */}
             {todo.category && (
